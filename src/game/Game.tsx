@@ -17,7 +17,7 @@ import { Player } from "./scene/Player";
 import { runtime, useGame } from "./store";
 import { ENTRY_TAPE } from "./config/tapes.config";
 import { FadeLayer, Hud, nextTape, OtherworldTint, Overlays, playTape, stopTape, TearFlash, ToolOverlay } from "./ui/Hud";
-import { IntroOverlay, TitleScreen } from "./ui/Title";
+import { IntroOverlay, StormCinematic, TitleScreen } from "./ui/Title";
 
 function finishIntro() {
   const g = useGame.getState();
@@ -69,7 +69,7 @@ function World() {
           <Dust />
         </>
       )}
-      {phase !== "title" && <Effects />}
+      {phase !== "title" && phase !== "storm" && <Effects />}
     </>
   );
 }
@@ -179,6 +179,7 @@ export default function Game() {
       </div>
       <OtherworldTint />
       {phase === "title" && <TitleScreen />}
+      {phase === "storm" && <StormCinematic />}
       {phase === "intro" && <IntroOverlay onSkip={finishIntro} />}
       {phase === "play" && (
         <>

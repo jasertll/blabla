@@ -110,7 +110,7 @@ export function IVStand({ position, rotY = 0, tilt = 0 }: P & { tilt?: number })
       </mesh>
       <mesh position={[0.14, 1.72, 0]} scale={[1, 1.6, 0.4]} castShadow>
         <sphereGeometry args={[0.07, 10, 8]} />
-        <meshStandardMaterial color="#c9c3a8" transparent opacity={0.6} roughness={0.2} />
+        <meshStandardMaterial color="#6f6a58" transparent opacity={0.5} roughness={0.55} />
       </mesh>
       <mesh position={[0.15, 1.15, 0.02]} rotation={[0, 0, 0.05]}>
         <cylinderGeometry args={[0.003, 0.003, 1, 4]} />

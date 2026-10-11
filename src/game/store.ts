@@ -2,7 +2,7 @@ import { create } from "zustand";
 import * as THREE from "three";
 import type { FloorId } from "./config/rooms.config";
 
-export type Phase = "title" | "intro" | "play";
+export type Phase = "title" | "storm" | "intro" | "play";
 export type Quality = "low" | "medium" | "high";
 export type PlayFloor = "EXTERIOR" | "1F" | "2F";
 

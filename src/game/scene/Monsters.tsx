@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { layoutFor, wallBoxes, type Box, type V2 } from "../level";
 import { runtime, useGame, type PlayFloor } from "../store";
 import { baseTexture } from "../textures";
-import { useCreature } from "./Creature";
+import { stalkerSkin, useCreature, useStalker } from "./Creature";
 import { collide } from "./Player";
 
 /** Distance from the player to every visible creature; the radio listens to it. */
@@ -141,6 +141,74 @@ function LyingFigure({ id, area, boxes, start }: { id: string; area: { min: V2; 
   return (
     <group ref={root}>
       <primitive object={creature.model} />
+    </group>
+  );
+}
+
+// ------------------------------------------------------------------ the stalker
+
+/** Follows at a distance. When the flashlight finds it, it freezes. */
+function Stalker({ id, area, boxes, start }: { id: string; area: { min: V2; max: V2 }; boxes: Box[]; start: V2 }) {
+  const root = useRef<THREE.Group>(null!);
+  const skin = useMemo(stalkerSkin, []);
+  const body = useStalker(skin);
+  const st = useRef({ pos: new THREE.Vector3(start[0], 0, start[1]), heading: Math.PI, speed: 0, opacity: 0, lit: 0, gone: 0 });
+
+  useFrame(({ clock }, rawDt) => {
+    const dt = Math.min(rawDt, 0.05);
+    const s = st.current;
+    const t = clock.elapsedTime;
+    const vx = runtime.pos.x - s.pos.x;
+    const vz = runtime.pos.z - s.pos.z;
+    const d = Math.hypot(vx, vz);
+    const lit = isLit(s.pos.x, s.pos.z, 14, 0.4);
+    s.lit = lit ? s.lit + dt : 0;
+
+    let speed = 0;
+    if (s.gone > 0) {
+      s.gone -= dt;
+      s.opacity = Math.max(0, s.opacity - dt * 1.5);
+      if (s.gone <= 0) {
+        // come back from the far end of its area
+        for (let i = 0; i < 12; i++) {
+          const p = randomIn(area);
+          if (p.distanceTo(runtime.pos) > 10) {
+            s.pos.copy(p);
+            break;
+          }
+        }
+      }
+    } else {
+      s.opacity = Math.min(1, s.opacity + dt * 0.4);
+      if (!lit && d > 2.6) speed = d > 9 ? 0.75 : 0.5;
+      // stared at too long, or too close: it is simply not there any more
+      if (s.lit > 2.5 || d < 1.8) s.gone = 12 + Math.random() * 10;
+    }
+    if (speed > 0) {
+      const want = Math.atan2(vx, vz);
+      s.heading += Math.atan2(Math.sin(want - s.heading), Math.cos(want - s.heading)) * (1 - Math.exp(-dt * 3));
+      s.pos.x += Math.sin(s.heading) * speed * dt;
+      s.pos.z += Math.cos(s.heading) * speed * dt;
+      collide(s.pos, boxes, 0.32);
+      s.pos.x = THREE.MathUtils.clamp(s.pos.x, area.min[0], area.max[0]);
+      s.pos.z = THREE.MathUtils.clamp(s.pos.z, area.min[1], area.max[1]);
+    } else if (lit && s.gone <= 0) {
+      // caught in the light: it turns its face to you
+      const want = Math.atan2(vx, vz);
+      s.heading += Math.atan2(Math.sin(want - s.heading), Math.cos(want - s.heading)) * (1 - Math.exp(-dt * 6));
+    }
+    s.speed += (speed - s.speed) * (1 - Math.exp(-dt * 4));
+    body.update(dt, s.speed, lit, t);
+    root.current.position.copy(s.pos);
+    root.current.rotation.y = s.heading;
+    root.current.visible = s.opacity > 0.01;
+    skin.opacity = s.opacity;
+    threatDistances.set(id, root.current.visible ? d : 99);
+  });
+
+  return (
+    <group ref={root}>
+      <primitive object={body.model} />
     </group>
   );
 }
@@ -296,6 +364,7 @@ export function Monsters({ floor }: { floor: PlayFloor }) {
       <group>
         <FogShadows count={intense ? 5 : 2} areas={layout.rects.slice(0, 1)} />
         {intense && <LyingFigure id="1f-a" area={area} boxes={boxes} start={[8, 6]} />}
+        {intense && <Stalker id="1f-s" area={{ min: [-9, -7], max: [9, 7] }} boxes={boxes} start={[-8, 6]} />}
         {nightmare && <Watcher id="1f-w" at={[-7.6, -6.6]} yaw={0.6} />}
       </group>
     );
@@ -305,6 +374,7 @@ export function Monsters({ floor }: { floor: PlayFloor }) {
     <group>
       <FogShadows count={intense ? 5 : 2} areas={[{ min: [-1.4, -23], max: [1.4, -6] }]} minDist={7} maxDist={18} />
       <LyingFigure id="2f-a" area={corridor} boxes={boxes} start={[0, -18]} />
+      <Stalker id="2f-s" area={{ min: [-1.2, -23], max: [1.2, 2.5] }} boxes={boxes} start={[0, -22]} />
       {intense && <LyingFigure id="2f-b" area={{ min: [-1.2, -14], max: [1.2, 2.5] }} boxes={boxes} start={[0.5, -13]} />}
       {nightmare && <Watcher id="2f-w" at={[0, -22.9]} yaw={0} />}
     </group>

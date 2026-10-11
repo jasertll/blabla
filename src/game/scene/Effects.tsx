@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { Bloom, ChromaticAberration, EffectComposer, Noise, Vignette } from "@react-three/postprocessing";
+import { Bloom, ChromaticAberration, EffectComposer, N8AO, Noise, Vignette } from "@react-three/postprocessing";
 import { BlendFunction, type ChromaticAberrationEffect, type NoiseEffect, type VignetteEffect } from "postprocessing";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -36,6 +36,7 @@ export function Effects() {
 
   return (
     <EffectComposer multisampling={quality === "high" ? 4 : 0}>
+      <N8AO aoRadius={0.9} distanceFalloff={0.6} intensity={2.6} quality={quality === "high" ? "high" : "medium"} halfRes={quality !== "high"} />
       <Bloom intensity={0.55} luminanceThreshold={0.62} luminanceSmoothing={0.3} mipmapBlur />
       <ChromaticAberration ref={ca} offset={offset} radialModulation modulationOffset={0.25} />
       <Noise ref={noise} premultiply blendFunction={BlendFunction.SCREEN} />

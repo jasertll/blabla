@@ -162,3 +162,13 @@ body {
     #d9cfb2;
   box-shadow: 0 30px 80px #000, inset 0 0 50px rgba(80, 50, 10, 0.4);
 }
+
+/* ---------------------------------------------------------------- storm */
+
+.storm-video {
+  filter: saturate(0.55) contrast(1.12) brightness(0.92);
+  animation: fade-in 1.2s ease-out both;
+}
+.storm-line {
+  animation: fade-in 2s ease-out 6s both;
+}

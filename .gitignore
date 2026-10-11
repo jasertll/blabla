@@ -27,3 +27,5 @@ next-env.d.ts
 
 # Personal music tapes (copyrighted, kept out of the repo)
 public/audio/tapes/*.mp3
+public/video/*.mp4
+public/video/*.webm

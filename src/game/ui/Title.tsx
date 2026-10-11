@@ -69,7 +69,7 @@ export function TitleScreen() {
     audio.start();
     audio.blip();
     useGame.getState().setFloor("EXTERIOR");
-    setPhase("intro");
+    setPhase("storm");
   };
 
   const cont = () => {
@@ -145,6 +145,38 @@ export function IntroOverlay({ onSkip }: { onSkip: () => void }) {
         </p>
       </div>
       <button onClick={onSkip} className="pointer-events-auto absolute right-4 top-[calc(11vh+12px)] font-display text-sm tracking-[0.3em] text-white/60 hover:text-white">
+        SKIP ▸
+      </button>
+    </div>
+  );
+}
+
+/** Opening cinematic: the storm, before the walk through the fog. */
+export function StormCinematic() {
+  const setPhase = useGame((s) => s.setPhase);
+  const [ended, setEnded] = useState(false);
+  const next = () => {
+    if (ended) return;
+    setEnded(true);
+    window.setTimeout(() => setPhase("intro"), 900);
+  };
+  return (
+    <div className={`absolute inset-0 z-40 bg-black transition-opacity duration-[900ms] ${ended ? "opacity-0" : "opacity-100"}`}>
+      <video
+        className="storm-video absolute inset-0 h-full w-full object-cover"
+        autoPlay
+        playsInline
+        onEnded={next}
+      >
+        <source src="video/storm.webm" type="video/webm" />
+        <source src="video/storm.mp4" type="video/mp4" onError={next} />
+      </video>
+      <div className="grain absolute inset-0" />
+      <div className="absolute inset-x-0 top-0 h-[11vh] bg-black" />
+      <div className="absolute inset-x-0 bottom-0 flex h-[11vh] items-center justify-center bg-black px-4">
+        <p className="subtitle storm-line font-display text-[clamp(0.95rem,2vw,1.35rem)] italic text-[#e8e4d8]">Then the storm came, and the town went quiet.</p>
+      </div>
+      <button onClick={next} className="absolute right-4 top-[calc(11vh+12px)] font-display text-sm tracking-[0.3em] text-white/60 hover:text-white">
         SKIP ▸
       </button>
     </div>
