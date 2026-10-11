@@ -29,3 +29,7 @@ next-env.d.ts
 public/audio/tapes/*.mp3
 public/video/*.mp4
 public/video/*.webm
+
+# Copied from node_modules by postinstall
+public/*.wasm
+public/pdf.worker.min.mjs

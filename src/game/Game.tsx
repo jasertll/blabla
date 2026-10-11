@@ -1,6 +1,8 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
+import { InvestigationProvider } from "@/contexts/InvestigationContext";
+import { ToolBridge } from "./tools/Bridge";
 import { Suspense, useEffect } from "react";
 import * as THREE from "three";
 import { closeOverlay, interact, toggleNightmare } from "./actions";
@@ -157,6 +159,8 @@ export default function Game() {
   const dpr: [number, number] = quality === "high" ? [1, 1.75] : quality === "medium" ? [1, 1.25] : [0.6, 0.85];
 
   return (
+    <InvestigationProvider>
+    <ToolBridge />
     <div className="fixed inset-0 overflow-hidden bg-black">
       <div className="absolute inset-0">
         <Canvas
@@ -191,5 +195,6 @@ export default function Game() {
       <TearFlash />
       <FadeLayer />
     </div>
+    </InvestigationProvider>
   );
 }

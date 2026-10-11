@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { closeOverlay, otherworldEvent, rideElevator, toggleNightmare, travelTo } from "../actions";
+import { closeOverlay, rideElevator, toggleNightmare, travelTo } from "../actions";
+import { ToolView } from "../tools/registry";
 import { audio } from "../audio";
 import { FLOORS, TOOLS, toolById } from "../config/rooms.config";
 import { TAPES } from "../config/tapes.config";
@@ -331,8 +332,8 @@ function MapOverlay() {
           { label: "201 · IP / ASN", node: "desk", at: [-5.4, -4], seen: visited.includes("201"), tool: "ip-asn" },
           { label: "LIFT", node: "elevator", at: [0, 3.2], seen: true },
         ];
-  const locked = floor === "2F" ? TOOLS.filter((t) => t.floor === "2F" && t.status === "planned") : [];
-  const lockedPos: Record<string, [number, number]> = { "202": [3.4, -4], "203": [-3.4, -12], "204": [3.4, -12], "205": [-3.4, -20], "206": [3.4, -20] };
+  const doors: Record<string, [number, number]> = { "202": [3.4, -4], "203": [-3.4, -12], "204": [3.4, -12], "205": [-3.4, -20], "206": [3.4, -20] };
+  const wardRooms = floor === "2F" ? TOOLS.filter((t) => doors[t.room]) : [];
 
   return (
     <Panel wide onClose={closeOverlay}>
@@ -373,12 +374,12 @@ function MapOverlay() {
               <rect key={i} x={c.min[0]} y={c.min[1]} width={c.max[0] - c.min[0]} height={c.max[1] - c.min[1]} strokeWidth={0.06} />
             ))}
           </g>
-          {locked.map((t) => {
-            const p = lockedPos[t.room];
+          {wardRooms.map((t) => {
+            const p = doors[t.room];
             return (
               <g key={t.id} transform={`translate(${p[0]} ${p[1]})`}>
                 <text textAnchor="middle" fontSize={0.9} fill="#5a5040" className="font-hand">
-                  {t.room} ✕
+                  {t.room}
                 </text>
               </g>
             );
@@ -408,6 +409,7 @@ function MapOverlay() {
         </svg>
       </div>
       <p className="mt-3 font-display text-sm tracking-[0.1em] text-white/45">Click a place to walk there. Red circles mark instruments you have found.</p>
+      <InstrumentList />
     </Panel>
   );
 }
@@ -517,8 +519,8 @@ function MiniPlayer() {
 
 // ------------------------------------------------------------------ tool view
 
-/** The examined object fills the screen and becomes the tool. The real tool
- *  components from the original site mount inside <ToolMount/>. */
+/** The examined object fills the screen and becomes the instrument: the real
+ *  tool component, wearing the hospital's palette. */
 export function ToolOverlay() {
   const id = useGame((s) => s.activeTool);
   const visible = useGame((s) => s.toolVisible);
@@ -530,60 +532,68 @@ export function ToolOverlay() {
     useGame.getState().closeTool();
   };
   return (
-    <div className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center p-3 sm:p-8">
-      <div className="vhs-in relative flex h-full max-h-[860px] w-full max-w-6xl flex-col border border-white/15 bg-[#080908]/92 shadow-[0_0_120px_#000]">
-        <div className="crt-lines pointer-events-none absolute inset-0" />
-        <header className="flex items-start justify-between border-b border-white/10 px-6 py-4">
-          <div>
+    <div className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center p-2 sm:p-5">
+      <div className="vhs-in relative flex h-full w-full max-w-[1500px] flex-col border border-white/15 bg-[#080908]/95 shadow-[0_0_120px_#000]">
+        <div className="crt-lines pointer-events-none absolute inset-0 z-10" />
+        <header className="flex items-start justify-between gap-4 border-b border-white/10 px-5 py-3">
+          <div className="min-w-0">
             <p className="font-mono text-[11px] tracking-[0.4em] text-red-400/80">
-              {tool.floor} · ROOM {tool.room} · {tool.category.toUpperCase()}
+              {tool.floor} · {tool.room === "???" ? "UNKNOWN ROOM" : `ROOM ${tool.room}`} · {tool.category.toUpperCase()}
             </p>
-            <h2 className="mt-1 font-display text-[clamp(1.4rem,3vw,2.2rem)] tracking-[0.08em] text-[#efebe0]">{tool.name}</h2>
-            <p className="mt-1 font-typewriter text-sm text-white/55">{tool.description}</p>
+            <h2 className="mt-1 font-display text-[clamp(1.3rem,2.6vw,2rem)] tracking-[0.08em] text-[#efebe0]">{tool.name}</h2>
+            <p className="mt-0.5 font-typewriter text-sm text-white/50">{tool.object}</p>
           </div>
-          <button onClick={close} className="font-display text-sm tracking-[0.3em] text-white/55 hover:text-white">
+          <button onClick={close} className="shrink-0 font-display text-sm tracking-[0.3em] text-white/55 hover:text-white">
             BACK <span className="ml-1 font-mono text-white/30">ESC</span>
           </button>
         </header>
-        <div className="relative flex-1 overflow-auto p-6">
-          <ToolMount toolId={tool.id} />
+        <div className="tool-scope relative min-h-0 flex-1 overflow-auto p-4 sm:p-5">
+          <ToolView refId={tool.ref} name={tool.name} />
         </div>
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-6 py-3">
-          <p className="font-mono text-[11px] tracking-wider text-white/35">Prototype: the real tool from the original site mounts here during the merge.</p>
-          <button
-            onClick={() => {
-              useGame.getState().closeTool();
-              otherworldEvent();
-            }}
-            className="border border-red-800/70 bg-red-950/40 px-4 py-2 font-display text-xs tracking-[0.25em] text-red-200 hover:bg-red-900/50"
-          >
-            DEMO · SIMULATE A CRITICAL FINDING
-          </button>
-        </footer>
       </div>
     </div>
   );
 }
 
-function ToolMount({ toolId }: { toolId: string }) {
+/** Every instrument in the building, by floor. Rooms not built yet open the
+ *  instrument straight from the archive. */
+function InstrumentList() {
+  const open = (id: string) => {
+    audio.blip();
+    const g = useGame.getState();
+    closeOverlay();
+    g.openTool(id);
+    g.showTool();
+  };
   return (
-    <div className="flex h-full min-h-[300px] flex-col items-center justify-center border border-dashed border-white/15 text-center">
-      <p className="font-mono text-xs tracking-[0.4em] text-white/35">MOUNT POINT</p>
-      <p className="mt-3 font-display text-xl tracking-[0.1em] text-white/70">&lt;{componentName(toolId)} /&gt;</p>
-      <p className="mt-3 max-w-md font-typewriter text-sm leading-6 text-white/40">
-        This panel is sized and styled for the tool. During the merge the existing React component is rendered here unchanged.
-      </p>
+    <div className="mt-5">
+      <p className="font-display text-xs tracking-[0.5em] text-white/40">THE INSTRUMENTS</p>
+      <div className="mt-3 grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+        {FLOORS.map((f) => {
+          const tools = TOOLS.filter((t) => t.floor === f.id);
+          if (!tools.length) return null;
+          return (
+            <div key={f.id}>
+              <p className="font-mono text-[11px] tracking-[0.3em] text-red-300/70">
+                {f.id} · {f.name.toUpperCase()}
+              </p>
+              <ul className="mt-1.5 space-y-0.5">
+                {tools.map((t) => (
+                  <li key={t.id}>
+                    <button onClick={() => open(t.id)} className="group flex w-full items-baseline gap-2 py-0.5 text-left">
+                      <span className="w-10 shrink-0 font-mono text-[11px] text-white/35">{t.room === "???" ? "—" : t.room}</span>
+                      <span className="font-display text-[15px] text-[#ece8dc]/80 group-hover:text-white">{t.name}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
-
-const componentName = (id: string) =>
-  id === "overview"
-    ? "ThreatGlobe"
-    : id
-        .split("-")
-        .map((p) => p[0].toUpperCase() + p.slice(1))
-        .join("") + "Tool";
 
 // ------------------------------------------------------------------ fx layers
 
