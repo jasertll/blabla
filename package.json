@@ -1,0 +1,30 @@
+{
+  "name": "brookhaven",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-three/fiber": "9.8.1",
+    "@react-three/postprocessing": "3.2.0",
+    "next": "16.4.0",
+    "postprocessing": "6.39.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "three": "0.186.1",
+    "zustand": "5.0.15"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/three": "0.186.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,580 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { closeOverlay, otherworldEvent, rideElevator, toggleNightmare, travelTo } from "../actions";
+import { audio } from "../audio";
+import { FLOORS, TOOLS, toolById } from "../config/rooms.config";
+import { TAPES } from "../config/tapes.config";
+import { FLOOR_LAYOUTS, layoutFor } from "../level";
+import { runtime, useGame, type PlayFloor } from "../store";
+
+// ------------------------------------------------------------------ HUD
+
+export function Hud() {
+  const floor = useGame((s) => s.floor);
+  const prompt = useGame((s) => s.prompt);
+  const nightmare = useGame((s) => s.nightmare);
+  const muted = useGame((s) => s.muted);
+  const overlay = useGame((s) => s.overlay);
+  const tool = useGame((s) => s.activeTool);
+  const busy = !!overlay || !!tool;
+  const [hint, setHint] = useState(true);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => setHint(false), 22000);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20 select-none">
+      <Location floor={floor} />
+      <div className={`pointer-events-auto absolute right-3 top-3 flex gap-2 transition-opacity ${busy ? "opacity-0" : "opacity-100"}`}>
+        <HudButton label="MAP" hotkey="M" onClick={() => useGame.getState().setOverlay("map")} />
+        <HudButton label={nightmare ? "WAKE UP" : "NIGHTMARE"} hotkey="N" danger={nightmare} onClick={toggleNightmare} />
+        <HudButton label={muted ? "SOUND OFF" : "SOUND ON"} onClick={() => useGame.getState().toggleMute()} />
+        <HudButton label="⚙" onClick={() => useGame.getState().setOverlay("settings")} />
+      </div>
+      {prompt && !busy && (
+        <div className="prompt absolute bottom-[14vh] left-1/2 -translate-x-1/2 text-center font-display text-lg tracking-[0.2em] text-[#ece8dc]">
+          <span className="mr-3 inline-block border border-[#ece8dc]/60 px-2 py-0.5 font-mono text-sm">E</span>
+          {prompt}
+        </div>
+      )}
+      <Message />
+      <Radio />
+      {hint && !busy && (
+        <div className="absolute bottom-4 left-4 max-w-[90vw] font-mono text-[11px] leading-relaxed tracking-wider text-white/45">
+          WASD move · SHIFT run · CLICK to look with the mouse · E examine · M map · N nightmare · ESC release
+        </div>
+      )}
+      <MiniPlayer />
+    </div>
+  );
+}
+
+function HudButton({ label, hotkey, onClick, danger }: { label: string; hotkey?: string; onClick: () => void; danger?: boolean }) {
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        audio.blip();
+        onClick();
+      }}
+      className={`hud-btn border px-3 py-1.5 font-display text-[12px] tracking-[0.25em] backdrop-blur-[2px] ${
+        danger ? "border-red-700/80 bg-red-950/50 text-red-200" : "border-white/25 bg-black/35 text-white/80 hover:text-white"
+      }`}
+    >
+      {label}
+      {hotkey && <span className="ml-2 text-white/35">{hotkey}</span>}
+    </button>
+  );
+}
+
+function Location({ floor }: { floor: PlayFloor }) {
+  const title = layoutFor(floor)?.title ?? "";
+  const [show, setShow] = useState(true);
+  useEffect(() => {
+    setShow(true);
+    const t = window.setTimeout(() => setShow(false), 5000);
+    return () => window.clearTimeout(t);
+  }, [floor]);
+  return (
+    <div className={`absolute left-4 top-4 font-display transition-opacity duration-[1500ms] ${show ? "opacity-100" : "opacity-0"}`}>
+      <p className="text-[11px] tracking-[0.5em] text-white/45">BROOKHAVEN HOSPITAL</p>
+      <p className="mt-1 text-xl tracking-[0.15em] text-[#ece8dc]">{title}</p>
+    </div>
+  );
+}
+
+function Message() {
+  const message = useGame((s) => s.message);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    if (!message) return;
+    setVisible(true);
+    const t = window.setTimeout(() => setVisible(false), 3800);
+    return () => window.clearTimeout(t);
+  }, [message]);
+  return (
+    <div
+      className={`absolute bottom-[22vh] left-1/2 w-[min(90vw,720px)] -translate-x-1/2 text-center font-display text-[clamp(1rem,2vw,1.35rem)] italic text-[#ece8dc] transition-opacity duration-700 [text-shadow:0_0_12px_#000] ${
+        visible ? "opacity-100" : "opacity-0"
+      }`}
+    >
+      {message?.text}
+    </div>
+  );
+}
+
+/** Pocket radio: bars jump with the static when something is close. */
+function Radio() {
+  const bars = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      const level = audio.getStatic();
+      const el = bars.current;
+      if (el) {
+        Array.from(el.children).forEach((b, i) => {
+          const on = level > i / 6 && Math.random() > 0.25;
+          (b as HTMLElement).style.opacity = on ? "1" : "0.15";
+        });
+        el.parentElement!.style.opacity = level > 0.02 ? "1" : "0.35";
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return (
+    <div className="absolute bottom-4 right-4 flex items-end gap-2 transition-opacity">
+      <span className="font-mono text-[10px] tracking-[0.3em] text-red-300/80">RADIO</span>
+      <div ref={bars} className="flex items-end gap-[3px]">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="w-[4px] bg-red-500" style={{ height: 5 + i * 3 }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ overlays
+
+function Panel({ children, wide, onClose }: { children: React.ReactNode; wide?: boolean; onClose: () => void }) {
+  return (
+    <div className="panel-in pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-black/55 p-4" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`relative max-h-[90vh] w-full overflow-auto border border-white/15 bg-[#0c0c0b]/90 p-6 shadow-[0_0_80px_#000] ${wide ? "max-w-4xl" : "max-w-xl"}`}
+      >
+        <button onClick={onClose} className="absolute right-4 top-3 font-display text-sm tracking-[0.3em] text-white/50 hover:text-white">
+          CLOSE ✕
+        </button>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function Overlays() {
+  const overlay = useGame((s) => s.overlay);
+  if (!overlay) return null;
+  switch (overlay) {
+    case "map":
+      return <MapOverlay />;
+    case "cassette":
+      return <CassetteOverlay />;
+    case "memo":
+      return <MemoOverlay />;
+    case "elevator":
+      return <ElevatorPanel />;
+    case "settings":
+      return <SettingsOverlay />;
+  }
+}
+
+function MemoOverlay() {
+  return (
+    <div className="panel-in pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-black/70 p-4" onClick={closeOverlay}>
+      <div onClick={(e) => e.stopPropagation()} className="memo relative w-full max-w-md rotate-[-1.2deg] p-8 font-typewriter text-[15px] leading-7 text-[#2a241a]">
+        <p className="mb-4 text-right text-xs">— found on a bench in the lobby</p>
+        <p>To whoever reads this,</p>
+        <p className="mt-3">
+          The hospital closed in the spring, but the servers in the basement never powered down. Every night the terminals upstairs light up on
+          their own and start scanning. Addresses. Names. Files nobody uploaded.
+        </p>
+        <p className="mt-3">
+          Each room keeps one of the instruments. I mapped the second floor before the doors started locking themselves. The rest is yours.
+        </p>
+        <p className="mt-3">If the radio starts to hiss, turn your light toward it. They hate the light.</p>
+        <p className="mt-5 text-right italic">— M.</p>
+        <button onClick={closeOverlay} className="absolute -bottom-10 left-1/2 -translate-x-1/2 font-display text-sm tracking-[0.3em] text-white/60">
+          CLOSE
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ElevatorPanel() {
+  const floor = useGame((s) => s.floor);
+  return (
+    <Panel onClose={closeOverlay}>
+      <p className="font-display text-xs tracking-[0.5em] text-white/40">ELEVATOR</p>
+      <h2 className="mt-1 font-display text-2xl tracking-[0.15em] text-[#ece8dc]">Select a floor</h2>
+      <div className="mt-6 grid gap-2">
+        {FLOORS.map((f) => {
+          const here = f.id === floor;
+          return (
+            <button
+              key={f.id}
+              disabled={!f.built || here}
+              onClick={() => rideElevator(f.id as PlayFloor)}
+              className={`flex items-center justify-between border px-4 py-3 text-left font-display tracking-[0.15em] transition ${
+                here
+                  ? "border-amber-600/60 bg-amber-900/20 text-amber-200"
+                  : f.built
+                    ? "border-white/20 text-[#ece8dc] hover:border-white/60 hover:bg-white/5"
+                    : "cursor-not-allowed border-white/5 text-white/25"
+              }`}
+            >
+              <span>
+                <span className="mr-4 inline-block w-12 font-mono">{f.id}</span>
+                {f.name}
+              </span>
+              <span className="text-xs tracking-[0.2em]">{here ? "YOU ARE HERE" : f.built ? "" : "NO POWER"}</span>
+            </button>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+function SettingsOverlay() {
+  const quality = useGame((s) => s.quality);
+  const muted = useGame((s) => s.muted);
+  const g = useGame.getState();
+  return (
+    <Panel onClose={closeOverlay}>
+      <p className="font-display text-xs tracking-[0.5em] text-white/40">OPTIONS</p>
+      <h2 className="mt-1 font-display text-2xl tracking-[0.15em] text-[#ece8dc]">Settings</h2>
+      <div className="mt-6 space-y-5 font-display tracking-[0.12em] text-[#ece8dc]">
+        <div>
+          <p className="mb-2 text-sm text-white/50">GRAPHICS QUALITY</p>
+          <div className="flex gap-2">
+            {(["low", "medium", "high"] as const).map((q) => (
+              <button key={q} onClick={() => g.setQuality(q)} className={`flex-1 border px-3 py-2 uppercase ${quality === q ? "border-white/70 bg-white/10" : "border-white/15 text-white/60"}`}>
+                {q}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-white/50">SOUND</p>
+          <button onClick={() => g.toggleMute()} className="border border-white/25 px-4 py-2">
+            {muted ? "OFF" : "ON"}
+          </button>
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-white/50">SAVE DATA</p>
+          <button
+            onClick={() => {
+              try {
+                localStorage.removeItem("brookhaven.save.v1");
+              } catch {
+                /* ignore */
+              }
+              g.say("Save data erased.");
+            }}
+            className="border border-red-800/60 px-4 py-2 text-red-300"
+          >
+            ERASE
+          </button>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+// ------------------------------------------------------------------ map
+
+/** Pencil-drawn floor plan. Visited rooms are marked; click a room to walk there. */
+function MapOverlay() {
+  const current = useGame((s) => s.floor);
+  const visited = useGame((s) => s.visited);
+  const [floor, setFloor] = useState<PlayFloor>(current === "EXTERIOR" ? "1F" : current);
+  const layout = FLOOR_LAYOUTS[floor as "1F" | "2F"];
+  const xs = layout.rects.flatMap((r) => [r.min[0], r.max[0]]);
+  const zs = layout.rects.flatMap((r) => [r.min[1], r.max[1]]);
+  const pad = 2;
+  const minX = Math.min(...xs) - pad;
+  const maxX = Math.max(...xs) + pad;
+  const minZ = Math.min(...zs) - pad;
+  const maxZ = Math.max(...zs) + pad;
+  const W = maxX - minX;
+  const H = maxZ - minZ;
+
+  const targets: { label: string; node: string; at: [number, number]; seen: boolean; tool?: string }[] =
+    floor === "1F"
+      ? [
+          { label: "OVERVIEW", node: "overview", at: [0, -4], seen: visited.includes("lobby"), tool: "overview" },
+          { label: "TAPES", node: "cassette", at: [-3.1, -4], seen: visited.includes("lobby") },
+          { label: "SAVE", node: "save", at: [-9.2, -5], seen: visited.includes("lobby") },
+          { label: "LIFT", node: "elevator", at: [11, 0], seen: true },
+        ]
+      : [
+          { label: "201 · IP / ASN", node: "desk", at: [-5.4, -4], seen: visited.includes("201"), tool: "ip-asn" },
+          { label: "LIFT", node: "elevator", at: [0, 3.2], seen: true },
+        ];
+  const locked = floor === "2F" ? TOOLS.filter((t) => t.floor === "2F" && t.status === "planned") : [];
+  const lockedPos: Record<string, [number, number]> = { "202": [3.4, -4], "203": [-3.4, -12], "204": [3.4, -12], "205": [-3.4, -20], "206": [3.4, -20] };
+
+  return (
+    <Panel wide onClose={closeOverlay}>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="font-display text-xs tracking-[0.5em] text-white/40">MAP</p>
+          <h2 className="mt-1 font-display text-2xl tracking-[0.15em] text-[#ece8dc]">{layout.title}</h2>
+        </div>
+        <div className="mr-24 flex gap-1">
+          {FLOORS.map((f) => (
+            <button
+              key={f.id}
+              disabled={!f.built}
+              onClick={() => setFloor(f.id as PlayFloor)}
+              className={`border px-2.5 py-1 font-mono text-xs ${floor === f.id ? "border-white/70 text-white" : f.built ? "border-white/20 text-white/60" : "border-white/5 text-white/20"}`}
+            >
+              {f.id}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="map-paper mt-4 p-3">
+        <svg viewBox={`${minX} ${minZ} ${W} ${H}`} className="block max-h-[62vh] w-full" style={{ aspectRatio: `${W} / ${H}` }}>
+          <defs>
+            <filter id="pencil">
+              <feTurbulence type="fractalNoise" baseFrequency="1.4" numOctaves="2" seed="3" />
+              <feDisplacementMap in="SourceGraphic" scale="0.25" />
+            </filter>
+          </defs>
+          <g filter="url(#pencil)" stroke="#3b342a" fill="none" strokeLinecap="round">
+            {layout.rects.map((r, i) => (
+              <rect key={i} x={r.min[0]} y={r.min[1]} width={r.max[0] - r.min[0]} height={r.max[1] - r.min[1]} fill="rgba(80,70,50,0.06)" stroke="none" />
+            ))}
+            {layout.walls.map((w, i) => (
+              <line key={i} x1={w.a[0]} y1={w.a[1]} x2={w.b[0]} y2={w.b[1]} strokeWidth={0.22} />
+            ))}
+            {layout.colliders.map((c, i) => (
+              <rect key={i} x={c.min[0]} y={c.min[1]} width={c.max[0] - c.min[0]} height={c.max[1] - c.min[1]} strokeWidth={0.06} />
+            ))}
+          </g>
+          {locked.map((t) => {
+            const p = lockedPos[t.room];
+            return (
+              <g key={t.id} transform={`translate(${p[0]} ${p[1]})`}>
+                <text textAnchor="middle" fontSize={0.9} fill="#5a5040" className="font-hand">
+                  {t.room} ✕
+                </text>
+              </g>
+            );
+          })}
+          {targets.map((t) => (
+            <g
+              key={t.label}
+              transform={`translate(${t.at[0]} ${t.at[1]})`}
+              className="cursor-pointer"
+              onClick={() => {
+                audio.blip();
+                travelTo(floor, t.node);
+              }}
+            >
+              <circle r={0.9} fill="transparent" />
+              {t.seen && t.tool && <circle r={0.75} fill="none" stroke="#a3150e" strokeWidth={0.12} />}
+              <text textAnchor="middle" y={0.3} fontSize={1.05} fill={t.seen ? "#2a2318" : "#7a7060"} className="font-hand">
+                {t.label}
+              </text>
+            </g>
+          ))}
+          {current === floor && (
+            <g transform={`translate(${runtime.pos.x} ${runtime.pos.z}) rotate(${(-runtime.yaw * 180) / Math.PI})`}>
+              <path d="M0 0.7 L-0.4 -0.4 L0 -0.15 L0.4 -0.4 Z" fill="#b3170f" />
+            </g>
+          )}
+        </svg>
+      </div>
+      <p className="mt-3 font-display text-sm tracking-[0.1em] text-white/45">Click a place to walk there. Red circles mark instruments you have found.</p>
+    </Panel>
+  );
+}
+
+// ------------------------------------------------------------------ cassette
+
+function CassetteOverlay() {
+  const tapeId = useGame((s) => s.tapeId);
+  const playing = useGame((s) => s.tapePlaying);
+  return (
+    <Panel onClose={closeOverlay}>
+      <p className="font-display text-xs tracking-[0.5em] text-white/40">CASSETTE RECORDER</p>
+      <h2 className="mt-1 font-display text-2xl tracking-[0.15em] text-[#ece8dc]">Choose a tape</h2>
+      <div className="mt-6 grid gap-3">
+        {TAPES.map((t) => {
+          const active = tapeId === t.id && playing;
+          return (
+            <button
+              key={t.id}
+              onClick={() => (active ? stopTape() : playTape(t.id))}
+              className={`group flex items-center gap-4 border p-3 text-left transition ${active ? "border-red-700/70 bg-red-950/30" : "border-white/15 hover:border-white/50"}`}
+            >
+              <Cassette color={t.color} spinning={active} />
+              <div className="flex-1">
+                <p className="font-typewriter text-[#ece8dc]">{t.title}</p>
+                <p className="mt-1 font-mono text-[11px] tracking-wider text-white/40">{t.src ? t.src : "generated ambience"}</p>
+              </div>
+              <span className="font-display text-xs tracking-[0.3em] text-white/60">{active ? "■ STOP" : "▶ PLAY"}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="mt-5 font-mono text-[11px] leading-5 text-white/40">
+        Add your own tapes: put audio files in <span className="text-white/70">public/audio/tapes/</span> and list them in{" "}
+        <span className="text-white/70">src/game/config/tapes.config.ts</span>.
+      </p>
+    </Panel>
+  );
+}
+
+export function playTape(id: string) {
+  const tape = TAPES.find((t) => t.id === id);
+  if (!tape) return;
+  useGame.getState().setTape(id, true);
+  audio.playTape(tape.src, () => {
+    const i = TAPES.findIndex((t) => t.id === id);
+    const next = TAPES[(i + 1) % TAPES.length];
+    if (next && TAPES.length > 1) playTape(next.id);
+    else useGame.getState().setTape(null, false);
+  });
+}
+
+export function stopTape() {
+  audio.stopTape();
+  useGame.getState().setTape(useGame.getState().tapeId, false);
+}
+
+function Cassette({ color, spinning, small }: { color: string; spinning: boolean; small?: boolean }) {
+  return (
+    <svg viewBox="0 0 100 64" className={small ? "h-8 w-12" : "h-12 w-[76px]"}>
+      <rect x="1" y="1" width="98" height="62" rx="4" fill="#1b1b1b" stroke="#444" />
+      <rect x="8" y="6" width="84" height="30" rx="2" fill={color} />
+      <rect x="22" y="14" width="56" height="16" rx="8" fill="#0d0d0d" />
+      {[36, 64].map((cx) => (
+        <g key={cx} className={spinning ? "reel-spin" : ""} style={{ transformOrigin: `${cx}px 22px` }}>
+          <circle cx={cx} cy={22} r={6} fill="#ddd" />
+          {[0, 60, 120].map((a) => (
+            <rect key={a} x={cx - 0.8} y={16.5} width={1.6} height={11} fill="#333" transform={`rotate(${a} ${cx} 22)`} />
+          ))}
+        </g>
+      ))}
+      <path d="M20 63 L28 46 H72 L80 63" fill="#2a2a2a" />
+    </svg>
+  );
+}
+
+function MiniPlayer() {
+  const tapeId = useGame((s) => s.tapeId);
+  const playing = useGame((s) => s.tapePlaying);
+  const tape = TAPES.find((t) => t.id === tapeId);
+  if (!tape || !playing) return null;
+  return (
+    <div className="pointer-events-auto absolute bottom-12 left-4 flex items-center gap-3 border border-white/15 bg-black/55 px-3 py-2 backdrop-blur-sm">
+      <Cassette color={tape.color} spinning small />
+      <div>
+        <p className="font-mono text-[10px] tracking-[0.3em] text-white/40">NOW PLAYING</p>
+        <p className="font-typewriter text-sm text-[#ece8dc]">{tape.title}</p>
+      </div>
+      <button onClick={stopTape} className="ml-2 font-display text-xs tracking-[0.2em] text-white/60 hover:text-white">
+        ■
+      </button>
+      {TAPES.length > 1 && (
+        <button
+          onClick={() => {
+            const i = TAPES.findIndex((t) => t.id === tape.id);
+            playTape(TAPES[(i + 1) % TAPES.length].id);
+          }}
+          className="font-display text-xs text-white/60 hover:text-white"
+        >
+          ▸▸
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ tool view
+
+/** The examined object fills the screen and becomes the tool. The real tool
+ *  components from the original site mount inside <ToolMount/>. */
+export function ToolOverlay() {
+  const id = useGame((s) => s.activeTool);
+  const visible = useGame((s) => s.toolVisible);
+  if (!id || !visible) return null;
+  const tool = toolById(id);
+  if (!tool) return null;
+  const close = () => {
+    audio.blip();
+    useGame.getState().closeTool();
+  };
+  return (
+    <div className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center p-3 sm:p-8">
+      <div className="vhs-in relative flex h-full max-h-[860px] w-full max-w-6xl flex-col border border-white/15 bg-[#080908]/92 shadow-[0_0_120px_#000]">
+        <div className="crt-lines pointer-events-none absolute inset-0" />
+        <header className="flex items-start justify-between border-b border-white/10 px-6 py-4">
+          <div>
+            <p className="font-mono text-[11px] tracking-[0.4em] text-red-400/80">
+              {tool.floor} · ROOM {tool.room} · {tool.category.toUpperCase()}
+            </p>
+            <h2 className="mt-1 font-display text-[clamp(1.4rem,3vw,2.2rem)] tracking-[0.08em] text-[#efebe0]">{tool.name}</h2>
+            <p className="mt-1 font-typewriter text-sm text-white/55">{tool.description}</p>
+          </div>
+          <button onClick={close} className="font-display text-sm tracking-[0.3em] text-white/55 hover:text-white">
+            BACK <span className="ml-1 font-mono text-white/30">ESC</span>
+          </button>
+        </header>
+        <div className="relative flex-1 overflow-auto p-6">
+          <ToolMount toolId={tool.id} />
+        </div>
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-6 py-3">
+          <p className="font-mono text-[11px] tracking-wider text-white/35">Prototype: the real tool from the original site mounts here during the merge.</p>
+          <button
+            onClick={() => {
+              useGame.getState().closeTool();
+              otherworldEvent();
+            }}
+            className="border border-red-800/70 bg-red-950/40 px-4 py-2 font-display text-xs tracking-[0.25em] text-red-200 hover:bg-red-900/50"
+          >
+            DEMO · SIMULATE A CRITICAL FINDING
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function ToolMount({ toolId }: { toolId: string }) {
+  return (
+    <div className="flex h-full min-h-[300px] flex-col items-center justify-center border border-dashed border-white/15 text-center">
+      <p className="font-mono text-xs tracking-[0.4em] text-white/35">MOUNT POINT</p>
+      <p className="mt-3 font-display text-xl tracking-[0.1em] text-white/70">&lt;{componentName(toolId)} /&gt;</p>
+      <p className="mt-3 max-w-md font-typewriter text-sm leading-6 text-white/40">
+        This panel is sized and styled for the tool. During the merge the existing React component is rendered here unchanged.
+      </p>
+    </div>
+  );
+}
+
+const componentName = (id: string) =>
+  id === "overview"
+    ? "ThreatGlobe"
+    : id
+        .split("-")
+        .map((p) => p[0].toUpperCase() + p.slice(1))
+        .join("") + "Tool";
+
+// ------------------------------------------------------------------ fx layers
+
+export function FadeLayer() {
+  const fade = useGame((s) => s.fade);
+  return <div className="pointer-events-none absolute inset-0 z-50 bg-black transition-opacity duration-700" style={{ opacity: fade }} />;
+}
+
+/** Red tear + glitch when the world flips into the Otherworld. */
+export function TearFlash() {
+  const tear = useGame((s) => s.tear);
+  if (!tear) return null;
+  return <div key={tear} className="tear pointer-events-none absolute inset-0 z-40" />;
+}
+
+export function OtherworldTint() {
+  const ow = useGame((s) => s.owActive);
+  return <div className={`pointer-events-none absolute inset-0 z-10 transition-opacity duration-[3000ms] ow-tint ${ow ? "opacity-100" : "opacity-0"}`} />;
+}
