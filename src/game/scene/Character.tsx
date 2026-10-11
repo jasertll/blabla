@@ -46,8 +46,8 @@ const beamMaterial = new THREE.ShaderMaterial({
     varying vec3 vN;
     varying vec3 vView;
     void main() {
-      float rim = pow(abs(dot(vN, vView)), 2.0);
-      float a = pow(vY, 2.2) * rim * uStrength;
+      float rim = pow(clamp(abs(dot(vN, vView)), 0.0, 1.0), 2.0);
+      float a = pow(clamp(vY, 0.0, 1.0), 2.2) * rim * uStrength;
       gl_FragColor = vec4(vec3(1.0, 0.96, 0.86) * a, a);
     }`,
 });

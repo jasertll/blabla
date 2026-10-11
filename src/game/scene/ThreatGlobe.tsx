@@ -37,8 +37,9 @@ const pointsMaterial = new THREE.ShaderMaterial({
     varying float vAlpha;
     void main() {
       vec3 p = position;
-      p += normalize(p) * sin(uTime * 2.0 + seed * 40.0) * 0.015;
-      p += normalize(p) * uDread * sin(uTime * 9.0 + seed * 70.0) * 0.08;
+      vec3 n = position / max(length(position), 1e-3);
+      p += n * sin(uTime * 2.0 + seed * 40.0) * 0.015;
+      p += n * uDread * sin(uTime * 9.0 + seed * 70.0) * 0.08;
       vec4 mv = modelViewMatrix * vec4(p, 1.0);
       gl_PointSize = (2.2 + seed * 2.5) * (6.0 / -mv.z);
       gl_Position = projectionMatrix * mv;

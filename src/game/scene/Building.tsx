@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { FloorLayout, V3 } from "../level";
+import { walkTo } from "../actions";
 import { M, releaseSurface, surface } from "../materials";
 import { runtime, useGame } from "../store";
 import { baseTexture, writingTexture } from "../textures";
@@ -54,7 +55,16 @@ export function Shell({ layout }: { layout: FloorLayout }) {
     <group>
       {parts.floors.map((f, i) => (
         <group key={i} position={f.pos}>
-          <mesh rotation={[-Math.PI / 2, 0, 0]} material={f.floor} receiveShadow>
+          <mesh
+            rotation={[-Math.PI / 2, 0, 0]}
+            material={f.floor}
+            receiveShadow
+            onClick={(e) => {
+              if (e.delta > 6) return; // a drag, not a click
+              e.stopPropagation();
+              walkTo(e.point.x, e.point.z);
+            }}
+          >
             <planeGeometry args={[f.w, f.d]} />
           </mesh>
           <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, parts.H, 0]} material={f.ceil} receiveShadow>

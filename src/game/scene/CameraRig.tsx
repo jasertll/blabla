@@ -40,6 +40,13 @@ export function CameraRig() {
       snap.current = true;
     }
 
+    // Cursor held near the left/right edge keeps turning the camera.
+    const g0 = useGame.getState();
+    if (!runtime.focus && !g0.overlay && !g0.activeTool && Math.abs(runtime.mouseX) > 0.86) {
+      runtime.camYaw -= Math.sign(runtime.mouseX) * (Math.abs(runtime.mouseX) - 0.86) * 12 * dt;
+      runtime.lastMouse = performance.now();
+    }
+
     // Let the camera drift behind the player when they walk without the mouse.
     const sinceMouse = performance.now() - runtime.lastMouse;
     if (!runtime.focus && runtime.speed > 0.5 && sinceMouse > 1500) {

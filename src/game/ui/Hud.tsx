@@ -44,7 +44,7 @@ export function Hud() {
       <Radio />
       {hint && !busy && (
         <div className="absolute bottom-4 left-4 max-w-[90vw] font-mono text-[11px] leading-relaxed tracking-wider text-white/45">
-          WASD move · SHIFT run · CLICK to look with the mouse · E examine · M map · N nightmare · ESC release
+          MOUSE look · CLICK the floor to walk · WASD move · SHIFT run · E examine · M map · N nightmare
         </div>
       )}
       <MiniPlayer />

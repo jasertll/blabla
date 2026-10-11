@@ -1,7 +1,7 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
-import { useCallback, useEffect } from "react";
+import { useEffect } from "react";
 import * as THREE from "three";
 import { closeOverlay, interact, toggleNightmare } from "./actions";
 import { audio } from "./audio";
@@ -10,7 +10,7 @@ import { Atmosphere, Dust } from "./scene/Atmosphere";
 import { Lobby, ScreenTicker, Shell, Ward } from "./scene/Building";
 import { CameraRig } from "./scene/CameraRig";
 import { Effects } from "./scene/Effects";
-import { Interaction } from "./scene/Interaction";
+import { Interaction, WalkMarker } from "./scene/Interaction";
 import { IntroScene } from "./scene/IntroScene";
 import { Monsters } from "./scene/Monsters";
 import { Player } from "./scene/Player";
@@ -58,6 +58,7 @@ function World() {
           <Player />
           <CameraRig />
           <Interaction />
+          <WalkMarker />
           <Dust />
         </>
       )}
@@ -95,11 +96,22 @@ export default function Game() {
     };
     const up = (e: KeyboardEvent) => runtime.keys.delete(e.code);
     const blur = () => runtime.keys.clear();
+    // The camera follows the mouse: no click or capture needed.
     const move = (e: MouseEvent) => {
-      if (!runtime.pointerLocked) return;
-      runtime.camYaw -= e.movementX * 0.0024;
-      runtime.camPitch = THREE.MathUtils.clamp(runtime.camPitch - e.movementY * 0.0018, -0.55, 0.35);
+      runtime.mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+      runtime.mouseY = (e.clientY / window.innerHeight) * 2 - 1;
+      const g = useGame.getState();
+      if (g.phase !== "play" || g.overlay || g.activeTool) return;
+      // the cursor jumping in from outside the window is not a look gesture
+      if (Math.abs(e.movementX) > 150 || Math.abs(e.movementY) > 150) return;
+      const k = runtime.pointerLocked ? 0.0024 : 0.0032;
+      runtime.camYaw -= e.movementX * k;
+      runtime.camPitch = THREE.MathUtils.clamp(runtime.camPitch - e.movementY * k * 0.7, -0.55, 0.35);
       runtime.lastMouse = performance.now();
+    };
+    const leave = () => {
+      runtime.mouseX = 0;
+      runtime.mouseY = 0;
     };
     const lockChange = () => {
       runtime.pointerLocked = !!document.pointerLockElement;
@@ -108,12 +120,14 @@ export default function Game() {
     window.addEventListener("keyup", up);
     window.addEventListener("blur", blur);
     window.addEventListener("mousemove", move);
+    document.addEventListener("mouseleave", leave);
     document.addEventListener("pointerlockchange", lockChange);
     return () => {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
       window.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseleave", leave);
       document.removeEventListener("pointerlockchange", lockChange);
     };
   }, []);
@@ -128,29 +142,22 @@ export default function Game() {
     [],
   );
 
-  const onCanvasClick = useCallback((e: React.MouseEvent) => {
-    const g = useGame.getState();
-    if (g.phase !== "play" || g.overlay || g.activeTool) return;
-    const el = e.currentTarget as HTMLElement;
-    try {
-      const p = el.requestPointerLock() as unknown as Promise<void> | undefined;
-      p?.catch?.(() => {});
-    } catch {
-      /* pointer lock unavailable */
-    }
-  }, []);
-
   const dpr: [number, number] = quality === "high" ? [1, 1.75] : quality === "medium" ? [1, 1.25] : [0.6, 0.85];
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-black">
-      <div className="absolute inset-0" onClick={onCanvasClick}>
+      <div className="absolute inset-0">
         <Canvas
           shadows={{ type: THREE.PCFShadowMap }}
           dpr={dpr}
           camera={{ fov: 52, near: 0.05, far: 90, position: [0, 1.6, 8] }}
           gl={{ antialias: false, powerPreference: "high-performance", stencil: false }}
           onCreated={({ gl }) => {
+            gl.domElement.addEventListener("webglcontextlost", (ev) => {
+              ev.preventDefault();
+              useGame.getState().say("The graphics card reset. Lowering quality…");
+              useGame.getState().setQuality("low");
+            });
             gl.toneMapping = THREE.ACESFilmicToneMapping;
             gl.toneMappingExposure = 1.05;
           }}

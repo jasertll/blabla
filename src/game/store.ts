@@ -31,6 +31,11 @@ export const runtime = {
   /** Interactable currently in reach (set by <Interaction/>). */
   near: null as null | import("./level").Interactable,
   lastMouse: 0,
+  /** Cursor position, -1..1 on each axis (edge of the screen keeps turning the camera). */
+  mouseX: 0,
+  mouseY: 0,
+  /** Where the last click-to-walk landed, for the floor marker. */
+  marker: { x: 0, z: 0, t: -10 },
 };
 
 interface SaveData {
@@ -106,7 +111,7 @@ export const useGame = create<GameState>((set, get) => ({
   visited: [],
   overlay: null,
   fade: 0,
-  quality: "high",
+  quality: "medium",
   muted: false,
   tapeId: null,
   tapePlaying: false,

@@ -54,6 +54,14 @@ export function travelTo(floor: PlayFloor, node: string) {
   g.setOverlay(null);
 }
 
+/** Click on the floor: walk straight there (walls still block). */
+export function walkTo(x: number, z: number) {
+  const g = useGame.getState();
+  if (g.phase !== "play" || g.overlay || g.activeTool) return;
+  runtime.path = [{ floor: g.floor, x, z }];
+  runtime.marker = { x, z, t: performance.now() };
+}
+
 export function interact(i: Interactable) {
   const g = useGame.getState();
   runtime.path = [];
