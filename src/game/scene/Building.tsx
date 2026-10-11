@@ -9,6 +9,22 @@ import { M, releaseSurface, surface } from "../materials";
 import { runtime, useGame } from "../store";
 import { baseTexture, writingTexture } from "../textures";
 import { getScreens } from "./screens";
+import {
+  BedsideCabinet,
+  BrokenCeiling,
+  DeadPlant,
+  FireCabinet,
+  Handrail,
+  HangingSign,
+  HospitalBed,
+  IVStand,
+  LinenCart,
+  NoticeBoard,
+  SinkMirror,
+  WaitingChairs,
+  Wardrobe,
+  WallClock,
+} from "./Props";
 import { ThreatGlobe } from "./ThreatGlobe";
 
 // ------------------------------------------------------------------ shell
@@ -460,6 +476,16 @@ export function Lobby() {
 
       <ElevatorDoors position={[9.88, 0, 0]} rotY={-Math.PI / 2} floorLabel="1F" />
       <Gurney position={[7.45, 0, 6.1]} rotY={0.1} />
+      <WaitingChairs position={[3.4, 0, 2.0]} rotY={Math.PI} count={4} />
+      <WaitingChairs position={[3.4, 0, 3.8]} rotY={Math.PI} count={4} missing={2} />
+      <DeadPlant position={[-9.3, 0, 6.8]} />
+      <DeadPlant position={[9.3, 0, 6.8]} />
+      <DeadPlant position={[-6.8, 0, -3.6]} />
+      <NoticeBoard position={[-9.88, 1.6, -1.5]} rotY={Math.PI / 2} />
+      <WallClock position={[5.2, 3.4, -7.88]} />
+      <FireCabinet position={[-3, 1.1, 7.86]} rotY={Math.PI} />
+      <HangingSign position={[0, 0, -1.6]} text="RECEPTION" height={5} />
+      <HangingSign position={[7, 0, -0.2]} rotY={-Math.PI / 2} text="ELEVATORS  →" height={5} />
       <Decal position={[7.5, 0.012, 0.8]} rotation={[-Math.PI / 2, 0, -0.6]} size={[2.6, 2.6]} map={baseTexture("blood")} opacity={0.85} />
       <Decal position={[-3, 0.012, 2.5]} rotation={[-Math.PI / 2, 0, 2.1]} size={[1.6, 1.6]} map={baseTexture("blood")} opacity={0.5} />
       <Decal position={[-9.88, 2.9, 3]} rotation={[0, Math.PI / 2, 0]} size={[4, 1]} map={writingTexture("THE FOG REMEMBERS")} opacity={0.9} />
@@ -518,6 +544,31 @@ export function Ward() {
       <ElevatorDoors position={[0, 0, 3.89]} rotY={Math.PI} floorLabel="2F" />
 
       <Wheelchair position={[1.3, 0, -9.1]} rotY={-0.7} />
+      {/* handrails, broken at every door */}
+      {[
+        [3.6, -3.3],
+        [-4.7, -11.3],
+        [-12.7, -19.3],
+        [-20.7, -23.6],
+      ].map(([a, b]) => (
+        <Handrail key={`w${a}`} position={[-1.69, 0, a]} rotY={Math.PI / 2} length={a - b} />
+      ))}
+      {[
+        [-23.6, -20.7],
+        [-19.3, -12.7],
+        [-11.3, -4.7],
+        [-3.3, 3.6],
+      ].map(([a, b]) => (
+        <Handrail key={`e${a}`} position={[1.69, 0, a]} rotY={-Math.PI / 2} length={b - a} />
+      ))}
+      <HangingSign position={[0, 0, -0.6]} text="WARD 2  ·  ROOMS 201 – 206" height={3.6} />
+      <WallClock position={[1.68, 2.35, -7]} rotY={-Math.PI / 2} />
+      <NoticeBoard position={[-1.68, 1.5, -8]} rotY={Math.PI / 2} />
+      <FireCabinet position={[1.62, 1.1, -16]} rotY={-Math.PI / 2} />
+      <IVStand position={[-1.15, 0, -17.6]} tilt={0.05} />
+      <LinenCart position={[-1.3, 0, -6.8]} rotY={Math.PI / 2} />
+      <BrokenCeiling position={[0, 0, -11]} height={3.6} />
+      <Gurney position={[1.15, 0, -14.2]} rotY={Math.PI / 2 + 0.05} />
       <Decal position={[0, 0.012, -15]} rotation={[-Math.PI / 2, 0, 1.4]} size={[3, 2.2]} map={baseTexture("blood")} opacity={0.7} />
       <Decal position={[1.68, 1.9, -15.5]} rotation={[0, -Math.PI / 2, 0]} size={[3.4, 0.85]} map={writingTexture("DON'T LOOK BACK")} opacity={0.85} />
 
@@ -561,32 +612,21 @@ export function Ward() {
           </mesh>
         </group>
 
-        {/* bed */}
-        <group position={[-5.2, 0, -8.4]}>
-          <mesh position={[0, 0.55, 0]} material={M.mattress} castShadow receiveShadow>
-            <boxGeometry args={[2.1, 0.2, 1]} />
-          </mesh>
-          <mesh position={[0, 0.42, 0]} material={M.metal}>
-            <boxGeometry args={[2.15, 0.06, 1.02]} />
-          </mesh>
-          <mesh position={[-1.05, 0.75, 0]} material={M.metal} castShadow>
-            <boxGeometry args={[0.04, 0.7, 1]} />
-          </mesh>
-          <mesh position={[0.2, 0.66, 0.1]} rotation={[-Math.PI / 2, 0, 0.8]}>
-            <planeGeometry args={[1, 0.7]} />
-            <meshStandardMaterial map={baseTexture("blood")} transparent depthWrite={false} />
-          </mesh>
-        </group>
+        <HospitalBed position={[-5.2, 0, -8.35]} />
+        <BedsideCabinet position={[-6.6, 0, -8.6]} />
+        <IVStand position={[-6.55, 0, -7.55]} />
+        <SinkMirror position={[-7.6, 0, 0.9]} rotY={Math.PI} />
+        <Wardrobe position={[-8.5, 0, -8.5]} rotY={Math.PI / 2} />
+        {/* the diary on the bedside cabinet */}
+        <mesh position={[-6.55, 0.81, -8.55]} rotation={[-Math.PI / 2, 0, 0.4]} material={M.paper}>
+          <planeGeometry args={[0.2, 0.26]} />
+        </mesh>
         {/* privacy curtain */}
         <mesh position={[-4, 1.4, -6.9]} material={M.curtain} castShadow>
           <planeGeometry args={[2.6, 2.4, 12, 1]} />
         </mesh>
         <mesh position={[-4, 2.62, -6.9]} rotation={[0, 0, Math.PI / 2]} material={M.metal}>
           <cylinderGeometry args={[0.015, 0.015, 2.8, 6]} />
-        </mesh>
-        {/* cabinet */}
-        <mesh position={[-8.55, 0.9, -8.45]} material={M.metal} castShadow receiveShadow>
-          <boxGeometry args={[0.75, 1.8, 0.85]} />
         </mesh>
         {/* boarded window */}
         <group position={[-5.4, 1.8, 0.88]} rotation={[0, Math.PI, 0]}>

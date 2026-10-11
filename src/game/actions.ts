@@ -88,6 +88,7 @@ export function interact(i: Interactable) {
       break;
     case "memo":
       audio.blip();
+      runtime.memoId = i.id;
       g.setOverlay("memo");
       break;
     case "save":

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { tex } from "./textures";
+import { normalTex, tex } from "./textures";
 
 // Surfaces register themselves here so the whole hospital can flip to the
 // Otherworld in one pass when `runtime.dread` crosses the threshold.
@@ -8,6 +8,7 @@ export type SurfaceKind = "wall" | "floor" | "ceiling" | "door";
 
 interface Look {
   map: THREE.Texture;
+  normal: THREE.Texture;
   color: THREE.Color;
   roughness: number;
   metalness: number;
@@ -25,27 +26,27 @@ let otherworld = false;
 
 const looks: Record<SurfaceKind, (rx: number, ry: number) => [Look, Look]> = {
   wall: (rx, ry) => [
-    { map: tex("wall", rx, ry), color: new THREE.Color(1, 1, 1), roughness: 0.92, metalness: 0, bump: 1.2 },
-    { map: tex("rust", rx, ry), color: new THREE.Color(0.85, 0.75, 0.72), roughness: 0.62, metalness: 0.35, bump: 3 },
+    { map: tex("wall", rx, ry), normal: normalTex("wall", rx, ry, 3), color: new THREE.Color(1, 1, 1), roughness: 0.78, metalness: 0, bump: 0.55 },
+    { map: tex("rust", rx, ry), normal: normalTex("rust", rx, ry, 8), color: new THREE.Color(0.85, 0.75, 0.72), roughness: 0.62, metalness: 0.35, bump: 1.4 },
   ],
   floor: (rx, ry) => [
-    { map: tex("tiles", rx, ry), color: new THREE.Color(1, 1, 1), roughness: 0.55, metalness: 0, bump: 0.8 },
-    { map: tex("grate", rx * 2, ry * 2), color: new THREE.Color(1, 0.9, 0.85), roughness: 0.5, metalness: 0.55, bump: 4 },
+    { map: tex("tiles", rx, ry), normal: normalTex("tiles", rx, ry, 4), color: new THREE.Color(1, 1, 1), roughness: 0.42, metalness: 0, bump: 0.7 },
+    { map: tex("grate", rx * 2, ry * 2), normal: normalTex("grate", rx * 2, ry * 2, 10), color: new THREE.Color(1, 0.9, 0.85), roughness: 0.5, metalness: 0.55, bump: 1.5 },
   ],
   ceiling: (rx, ry) => [
-    { map: tex("ceiling", rx, ry), color: new THREE.Color(0.9, 0.9, 0.88), roughness: 0.95, metalness: 0, bump: 0.6 },
-    { map: tex("rust", rx, ry), color: new THREE.Color(0.45, 0.32, 0.3), roughness: 0.7, metalness: 0.3, bump: 3 },
+    { map: tex("ceiling", rx, ry), normal: normalTex("ceiling", rx, ry, 5), color: new THREE.Color(0.9, 0.9, 0.88), roughness: 0.95, metalness: 0, bump: 0.8 },
+    { map: tex("rust", rx, ry), normal: normalTex("rust", rx, ry, 8), color: new THREE.Color(0.45, 0.32, 0.3), roughness: 0.7, metalness: 0.3, bump: 1.4 },
   ],
   door: () => [
-    { map: tex("door"), color: new THREE.Color(1, 1, 1), roughness: 0.75, metalness: 0.2, bump: 1 },
-    { map: tex("doorOW"), color: new THREE.Color(1, 0.9, 0.9), roughness: 0.55, metalness: 0.5, bump: 2 },
+    { map: tex("door"), normal: normalTex("door", 1, 1, 6), color: new THREE.Color(1, 1, 1), roughness: 0.75, metalness: 0.2, bump: 1 },
+    { map: tex("doorOW"), normal: normalTex("doorOW", 1, 1, 8), color: new THREE.Color(1, 0.9, 0.9), roughness: 0.55, metalness: 0.5, bump: 1.4 },
   ],
 };
 
 function apply(e: Entry, l: Look) {
   e.mat.map = l.map;
-  e.mat.bumpMap = l.map;
-  e.mat.bumpScale = l.bump;
+  e.mat.normalMap = l.normal;
+  e.mat.normalScale.set(l.bump, l.bump);
   e.mat.color.copy(l.color);
   e.mat.roughness = l.roughness;
   e.mat.metalness = l.metalness;

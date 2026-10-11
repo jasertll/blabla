@@ -44,7 +44,7 @@ export function Hud() {
       <Radio />
       {hint && !busy && (
         <div className="absolute bottom-4 left-4 max-w-[90vw] font-mono text-[11px] leading-relaxed tracking-wider text-white/45">
-          MOUSE look · CLICK the floor to walk · WASD move · SHIFT run · E examine · M map · N nightmare
+          MOUSE look · CLICK the floor to walk · WASD move · SHIFT run · E examine · M map · N nightmare · T next song · P pause music
         </div>
       )}
       <MiniPlayer />
@@ -173,11 +173,11 @@ export function Overlays() {
   }
 }
 
-function MemoOverlay() {
-  return (
-    <div className="panel-in pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-black/70 p-4" onClick={closeOverlay}>
-      <div onClick={(e) => e.stopPropagation()} className="memo relative w-full max-w-md rotate-[-1.2deg] p-8 font-typewriter text-[15px] leading-7 text-[#2a241a]">
-        <p className="mb-4 text-right text-xs">— found on a bench in the lobby</p>
+const MEMOS: Record<string, { found: string; body: React.ReactNode }> = {
+  "memo-lobby": {
+    found: "found on a bench in the lobby",
+    body: (
+      <>
         <p>To whoever reads this,</p>
         <p className="mt-3">
           The hospital closed in the spring, but the servers in the basement never powered down. Every night the terminals upstairs light up on
@@ -188,6 +188,30 @@ function MemoOverlay() {
         </p>
         <p className="mt-3">If the radio starts to hiss, turn your light toward it. They hate the light.</p>
         <p className="mt-5 text-right italic">— M.</p>
+      </>
+    ),
+  },
+  "diary-201": {
+    found: "pages torn from a diary, room 201",
+    body: (
+      <>
+        <p>Day 3. The nurse says the terminal in my room isn&apos;t plugged into anything. Then how does it know my name?</p>
+        <p className="mt-3">Day 9. Tonight it printed every address on my street. Only the houses with their lights on.</p>
+        <p className="mt-3">Day 14. I asked them to take it away. They told me there has never been a terminal in room 201.</p>
+        <p className="mt-3">Day 15. I stopped sleeping. It doesn&apos;t sleep either. We understand each other now.</p>
+        <p className="mt-5 italic">Day ?. If you are reading this, it is looking at you.</p>
+      </>
+    ),
+  },
+};
+
+function MemoOverlay() {
+  const memo = MEMOS[runtime.memoId] ?? MEMOS["memo-lobby"];
+  return (
+    <div className="panel-in pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-black/70 p-4" onClick={closeOverlay}>
+      <div onClick={(e) => e.stopPropagation()} className="memo relative w-full max-w-md rotate-[-1.2deg] p-8 font-typewriter text-[15px] leading-7 text-[#2a241a]">
+        <p className="mb-4 text-right text-xs">— {memo.found}</p>
+        {memo.body}
         <button onClick={closeOverlay} className="absolute -bottom-10 left-1/2 -translate-x-1/2 font-display text-sm tracking-[0.3em] text-white/60">
           CLOSE
         </button>
@@ -436,6 +460,13 @@ export function playTape(id: string) {
   });
 }
 
+/** Next tape on the shelf (T key and the player's ▸▸ button). */
+export function nextTape() {
+  const { tapeId } = useGame.getState();
+  const i = TAPES.findIndex((t) => t.id === tapeId);
+  playTape(TAPES[(i + 1) % TAPES.length].id);
+}
+
 export function stopTape() {
   audio.stopTape();
   useGame.getState().setTape(useGame.getState().tapeId, false);
@@ -476,14 +507,8 @@ function MiniPlayer() {
         ■
       </button>
       {TAPES.length > 1 && (
-        <button
-          onClick={() => {
-            const i = TAPES.findIndex((t) => t.id === tape.id);
-            playTape(TAPES[(i + 1) % TAPES.length].id);
-          }}
-          className="font-display text-xs text-white/60 hover:text-white"
-        >
-          ▸▸
+        <button onClick={nextTape} className="font-display text-xs text-white/60 hover:text-white" title="Next song (T)">
+          ▸▸ <span className="font-mono text-white/35">T</span>
         </button>
       )}
     </div>

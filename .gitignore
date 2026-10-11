@@ -24,3 +24,6 @@ out/
 next-env.d.ts
 *.tsbuildinfo
 .env*.local
+
+# Personal music tapes (copyrighted, kept out of the repo)
+public/audio/tapes/*.mp3

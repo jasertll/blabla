@@ -6,13 +6,13 @@ import * as THREE from "three";
 import { layoutFor, wallBoxes, type Box, type V2 } from "../level";
 import { runtime, useGame, type PlayFloor } from "../store";
 import { baseTexture } from "../textures";
+import { useCreature } from "./Creature";
 import { collide } from "./Player";
 
 /** Distance from the player to every visible creature; the radio listens to it. */
 export const threatDistances = new Map<string, number>();
 
-const flesh = () =>
-  new THREE.MeshStandardMaterial({ color: "#2a1916", roughness: 0.5, metalness: 0, transparent: true });
+const flesh = () => new THREE.MeshStandardMaterial({ color: "#2a1916", roughness: 0.34, metalness: 0.05, transparent: true });
 
 const tmp = new THREE.Vector3();
 
@@ -38,36 +38,8 @@ function randomIn(area: { min: V2; max: V2 }) {
 /** Faceless figure bound in its own skin. Wanders, writhes, and shrinks from light. */
 function LyingFigure({ id, area, boxes, start }: { id: string; area: { min: V2; max: V2 }; boxes: Box[]; start: V2 }) {
   const root = useRef<THREE.Group>(null!);
-  const body = useRef<THREE.Group>(null!);
-  const legL = useRef<THREE.Group>(null!);
-  const legR = useRef<THREE.Group>(null!);
   const mat = useMemo(flesh, []);
-  const torso = useMemo(() => {
-    const pts = [
-      [0.0, 0.0],
-      [0.13, 0.06],
-      [0.19, 0.25],
-      [0.21, 0.5],
-      [0.2, 0.72],
-      [0.15, 0.88],
-      [0.1, 0.98],
-      [0.11, 1.05],
-      [0.07, 1.12],
-      [0.0, 1.15],
-    ].map(([r, y]) => new THREE.Vector2(r, y));
-    const g = new THREE.LatheGeometry(pts, 18);
-    // lumpy, uneven surface
-    const p = g.attributes.position as THREE.BufferAttribute;
-    for (let i = 0; i < p.count; i++) {
-      const y = p.getY(i);
-      const a = Math.atan2(p.getZ(i), p.getX(i));
-      const k = 1 + Math.sin(y * 23 + a * 3) * 0.06 + Math.sin(y * 9 - a * 5) * 0.05;
-      p.setX(i, p.getX(i) * k);
-      p.setZ(i, p.getZ(i) * k * 0.82);
-    }
-    g.computeVertexNormals();
-    return g;
-  }, []);
+  const creature = useCreature(mat);
 
   const s = useRef({
     pos: new THREE.Vector3(start[0], 0, start[1]),
@@ -77,7 +49,7 @@ function LyingFigure({ id, area, boxes, start }: { id: string; area: { min: V2; 
     opacity: 1,
     heading: 0,
     twitch: 0,
-    gait: 0,
+    speed: 0,
   });
 
   useFrame(({ clock }, rawDt) => {
@@ -101,18 +73,18 @@ function LyingFigure({ id, area, boxes, start }: { id: string; area: { min: V2; 
         const dz = st.target.z - st.pos.z;
         if (Math.hypot(dx, dz) < 0.4) st.target = randomIn(area);
         dir = Math.atan2(dx, dz);
-        speed = 0.6;
+        speed = 0.55;
         if (nightmare && d < 14) st.mode = "approach";
         break;
       }
       case "approach":
         dir = Math.atan2(toPlayer.x, toPlayer.z);
-        speed = d > 2.4 ? 1.05 : 0;
+        speed = d > 2.4 ? 0.95 : 0;
         if (!nightmare) st.mode = "wander";
         break;
       case "flee":
         dir = Math.atan2(-toPlayer.x, -toPlayer.z);
-        speed = 2.3;
+        speed = 2.1;
         st.timer -= dt;
         st.opacity = Math.max(0, st.timer / 2.4);
         if (st.timer <= 0) {
@@ -136,56 +108,39 @@ function LyingFigure({ id, area, boxes, start }: { id: string; area: { min: V2; 
         }
         break;
     }
-    if (st.mode !== "flee") st.opacity = Math.min(1, st.opacity + dt * (st.mode === "hidden" ? -2 : 0.5));
+    if (st.mode !== "flee") st.opacity = Math.min(1, st.opacity + dt * 0.5);
     if (st.mode === "hidden") st.opacity = 0;
 
     if (speed > 0) {
       const turn = Math.atan2(Math.sin(dir - st.heading), Math.cos(dir - st.heading));
-      st.heading += turn * (1 - Math.exp(-dt * 5));
+      st.heading += turn * (1 - Math.exp(-dt * 4));
       // shuffle: lurches forward in uneven pulses
-      const lurch = 0.55 + Math.max(0, Math.sin(t * 4.2 + st.pos.x)) * 0.9;
+      const lurch = 0.5 + Math.max(0, Math.sin(t * 3.6 + st.pos.x)) * 0.9;
       st.pos.x += Math.sin(st.heading) * speed * lurch * dt;
       st.pos.z += Math.cos(st.heading) * speed * lurch * dt;
       collide(st.pos, boxes, 0.3);
       st.pos.x = THREE.MathUtils.clamp(st.pos.x, area.min[0], area.max[0]);
       st.pos.z = THREE.MathUtils.clamp(st.pos.z, area.min[1], area.max[1]);
-      st.gait += dt * speed * 5;
     }
+    st.speed += (speed - st.speed) * (1 - Math.exp(-dt * 4));
 
     // writhing: constant unease, violent spasms when lit
     st.twitch = Math.max(0, st.twitch - dt);
-    if (Math.random() < (lit ? 0.2 : 0.012)) st.twitch = 0.15 + Math.random() * 0.25;
-    const sp = st.twitch > 0 ? 1 : 0;
-    body.current.rotation.z = Math.sin(t * 2.3) * 0.08 + sp * (Math.random() - 0.5) * 0.5;
-    body.current.rotation.x = 0.12 + Math.sin(t * 1.7) * 0.05 + sp * (Math.random() - 0.5) * 0.4;
-    body.current.rotation.y = sp * (Math.random() - 0.5) * 0.6;
-    body.current.scale.set(1 + Math.sin(t * 3.1) * 0.03, 1 + Math.sin(t * 2.2) * 0.02, 1);
-    legL.current.rotation.x = Math.sin(st.gait) * 0.35;
-    legR.current.rotation.x = -Math.sin(st.gait) * 0.35;
+    if (Math.random() < (lit ? 0.25 : 0.015)) st.twitch = 0.12 + Math.random() * 0.25;
+    creature.update(dt, st.speed, st.twitch > 0, t);
 
     root.current.position.copy(st.pos);
     root.current.rotation.y = st.heading;
     root.current.visible = st.opacity > 0.01;
     mat.opacity = st.opacity;
-    mat.color.setRGB(0.028 + runtime.dread * 0.02, 0.012, 0.01);
+    mat.transparent = st.opacity < 0.99;
+    mat.color.setRGB(0.05 + runtime.dread * 0.03, 0.018, 0.014);
     threatDistances.set(id, root.current.visible ? d : 99);
   });
 
   return (
     <group ref={root}>
-      <group ref={legL} position={[0.08, 0.82, 0]} rotation={[0, 0, 0.05]}>
-        <mesh position={[0, -0.41, 0.04]} rotation={[0.1, 0, 0]} material={mat} castShadow>
-          <capsuleGeometry args={[0.05, 0.72, 4, 8]} />
-        </mesh>
-      </group>
-      <group ref={legR} position={[-0.08, 0.82, 0]} rotation={[0, 0, -0.05]}>
-        <mesh position={[0, -0.41, 0.04]} rotation={[0.1, 0, 0]} material={mat} castShadow>
-          <capsuleGeometry args={[0.05, 0.72, 4, 8]} />
-        </mesh>
-      </group>
-      <group ref={body} position={[0, 0.78, 0]}>
-        <mesh geometry={torso} material={mat} castShadow />
-      </group>
+      <primitive object={creature.model} />
     </group>
   );
 }

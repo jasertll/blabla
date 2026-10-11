@@ -1,17 +1,20 @@
 // Cassette tapes for the in-world recorder.
 // Drop audio files into /public/audio/tapes/ and add an entry here.
-// A tape without `src` plays a generated ambient loop (useful before real files exist).
+// Paths are relative so the same build works under any base URL.
+// A tape without `src` plays a generated ambient loop.
 
 export interface Tape {
   id: string;
   title: string;
-  /** e.g. "/audio/tapes/my-song.mp3" */
   src?: string;
   /** Label colour on the cassette shell. */
   color: string;
 }
 
 export const TAPES: Tape[] = [
-  { id: "tape-00", title: "Tape 00 — Hospital Hum", color: "#8b2b23" },
-  // { id: "tape-01", title: "Your song", src: "/audio/tapes/your-song.mp3", color: "#2f4a5a" },
+  { id: "lilium", title: "Lilium (Saint Version)", src: "audio/tapes/lilium.mp3", color: "#7a1f1a" },
+  { id: "dont-look-behind", title: "Don't Look Behind", src: "audio/tapes/dont-look-behind.mp3", color: "#2c3e48" },
 ];
+
+/** Plays on its own the first time you step into the hospital. */
+export const ENTRY_TAPE = "lilium";

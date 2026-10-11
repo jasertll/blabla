@@ -444,7 +444,7 @@ class AudioEngine {
 
     if (src) {
       const el = new Audio(src);
-      el.crossOrigin = "anonymous";
+      el.loop = true;
       this.tapeEl = el;
       this.tapeSrc = ctx.createMediaElementSource(el);
       this.tapeSrc.connect(this.music);

@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { audio } from "../audio";
+import { ENTRY_TAPE } from "../config/tapes.config";
 import { hasSave, runtime, useGame } from "../store";
+import { playTape } from "./Hud";
 
 /** Drifting fog drawn on a canvas: layered soft blobs scrolling at different speeds. */
 export function FogCanvas({ className = "", tint = "rgba(170,172,168," }: { className?: string; tint?: string }) {
@@ -77,6 +79,7 @@ export function TitleScreen() {
     if (!g.load()) return newGame();
     g.setFade(1);
     g.setPhase("play");
+    if (!g.tapePlaying) playTape(ENTRY_TAPE);
     runtime.camYaw = runtime.yaw;
     window.setTimeout(() => useGame.getState().setFade(0), 400);
   };

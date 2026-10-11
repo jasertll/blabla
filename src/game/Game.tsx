@@ -1,7 +1,7 @@
 "use client";
 
 import { Canvas } from "@react-three/fiber";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import * as THREE from "three";
 import { closeOverlay, interact, toggleNightmare } from "./actions";
 import { audio } from "./audio";
@@ -15,7 +15,8 @@ import { IntroScene } from "./scene/IntroScene";
 import { Monsters } from "./scene/Monsters";
 import { Player } from "./scene/Player";
 import { runtime, useGame } from "./store";
-import { FadeLayer, Hud, OtherworldTint, Overlays, TearFlash, ToolOverlay } from "./ui/Hud";
+import { ENTRY_TAPE } from "./config/tapes.config";
+import { FadeLayer, Hud, nextTape, OtherworldTint, Overlays, playTape, stopTape, TearFlash, ToolOverlay } from "./ui/Hud";
 import { IntroOverlay, TitleScreen } from "./ui/Title";
 
 function finishIntro() {
@@ -31,10 +32,14 @@ function finishIntro() {
     s.setFloor("1F");
     s.setPhase("play");
     audio.creak();
+    if (!s.tapePlaying) playTape(ENTRY_TAPE);
   }, 800);
   window.setTimeout(() => {
     useGame.getState().setFade(0);
   }, 1500);
+  window.setTimeout(() => {
+    useGame.getState().say("I've never been inside this place. So why do I know where the elevator is?");
+  }, 3200);
 }
 
 function World() {
@@ -50,7 +55,9 @@ function World() {
         <group key={floor}>
           <Shell layout={layout} />
           {floor === "1F" ? <Lobby /> : <Ward />}
-          <Monsters floor={floor} />
+          <Suspense fallback={null}>
+            <Monsters floor={floor} />
+          </Suspense>
         </group>
       )}
       {phase === "play" && (
@@ -92,6 +99,11 @@ export default function Game() {
       runtime.keys.add(e.code);
       if (e.code === "KeyE" && runtime.near) interact(runtime.near);
       if (e.code === "KeyN") toggleNightmare();
+      if (e.code === "KeyT") nextTape();
+      if (e.code === "KeyP") {
+        if (g.tapePlaying) stopTape();
+        else playTape(g.tapeId ?? ENTRY_TAPE);
+      }
       if (e.code.startsWith("Arrow") || e.code === "Space") e.preventDefault();
     };
     const up = (e: KeyboardEvent) => runtime.keys.delete(e.code);

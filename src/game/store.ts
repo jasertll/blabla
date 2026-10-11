@@ -32,6 +32,8 @@ export const runtime = {
   near: null as null | import("./level").Interactable,
   lastMouse: 0,
   /** Cursor position, -1..1 on each axis (edge of the screen keeps turning the camera). */
+  /** Which memo the memo overlay shows. */
+  memoId: "memo-lobby",
   mouseX: 0,
   mouseY: 0,
   /** Where the last click-to-walk landed, for the floor marker. */

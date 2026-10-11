@@ -82,6 +82,11 @@ const LOBBY: FloorLayout = {
     { min: [-9.9, 0], max: [-9.1, 3] }, // bench
     { min: [9.8, -1.3], max: [10.2, 1.3] }, // elevator doors
     { min: [6.5, 5.6], max: [8.4, 6.6] }, // gurney
+    { min: [2.2, 1.75], max: [4.6, 2.3] }, // waiting chairs
+    { min: [2.2, 3.55], max: [4.6, 4.1] },
+    { min: [-9.55, 6.55], max: [-9.05, 7.05] }, // plants
+    { min: [9.05, 6.55], max: [9.55, 7.05] },
+    { min: [-7.05, -3.85], max: [-6.55, -3.35] },
   ],
   interactables: [
     {
@@ -105,6 +110,9 @@ const LOBBY: FloorLayout = {
     { id: "memo-lobby", kind: "memo", at: [-8.5, 1.5], radius: 1.2, label: "Read the note" },
     { id: "save-lobby", kind: "save", at: [-9, -5], radius: 1.3, label: "Touch the red square" },
     { id: "elevator-1f", kind: "elevator", at: [9.2, 0], radius: 1.4, label: "Call the elevator" },
+    { id: "clock-1f", kind: "message", at: [5.2, -7.1], radius: 1.1, label: "Look at the clock", text: "It stopped at 4:17. The letter was postmarked 4:17 too." },
+    { id: "notice-1f", kind: "message", at: [-9.0, -1.5], radius: 1.2, label: "Read the notice board", text: "Visiting hours are suspended until further notice. The notice is dated nine years ago." },
+    { id: "chairs-1f", kind: "message", at: [3.4, 1.25], radius: 1.0, label: "Look at the chairs", text: "One of the seats is still warm. Nobody has waited here in years." },
     {
       id: "entrance",
       kind: "message",
@@ -161,6 +169,12 @@ const WARD: FloorLayout = {
     { min: [-6.3, -8.95], max: [-4.1, -7.85] }, // bed
     { min: [-8.95, -8.95], max: [-8.15, -8.0] }, // cabinet
     { min: [0.9, -9.6], max: [1.75, -8.6] }, // wheelchair
+    { min: [-1.65, -7.3], max: [-0.95, -6.3] }, // linen cart
+    { min: [0.75, -15.25], max: [1.6, -13.15] }, // gurney
+    { min: [-1.35, -17.8], max: [-0.95, -17.4] }, // drip stand
+    { min: [-6.85, -8.85], max: [-6.35, -8.35] }, // bedside cabinet
+    { min: [-7.9, 0.45], max: [-7.3, 1.0] }, // sink
+    { min: [-6.75, -7.75], max: [-6.35, -7.35] }, // drip stand in 201
   ],
   interactables: [
     {
@@ -180,6 +194,11 @@ const WARD: FloorLayout = {
     { id: "door-206", kind: "locked", at: [1.15, -20], radius: 1.0, label: "Room 206", text: "Room 206 — Attack Surface Report. It's locked. (Not built yet.)" },
     { id: "stairs-2f", kind: "locked", at: [0, -23.3], radius: 1.2, label: "Stairwell", text: "The stairwell door is chained shut." },
     { id: "elevator-2f", kind: "elevator", at: [0, 3.2], radius: 1.4, label: "Call the elevator" },
+    { id: "wheelchair-2f", kind: "message", at: [0.5, -9.1], radius: 0.9, label: "Examine the wheelchair", text: "Someone left in a hurry. Or never left at all." },
+    { id: "notice-2f", kind: "message", at: [-1.0, -8], radius: 0.9, label: "Read the notice board", text: "PATIENT 201: NO NETWORK ACCESS UNDER ANY CIRCUMSTANCES. Underlined three times." },
+    { id: "mirror-201", kind: "message", at: [-7.6, 0.15], radius: 0.9, label: "Look in the mirror", text: "That's me. I'm almost sure that's me." },
+    { id: "bed-201", kind: "message", at: [-4.6, -7.4], radius: 0.9, label: "Examine the bed", text: "The mattress is soaked through. The stain has the shape of someone lying down." },
+    { id: "diary-201", kind: "memo", at: [-6.1, -8.0], radius: 0.9, label: "Read the diary" },
   ],
   camZones: [{ min: [-9, -9], max: [-1.8, 1], cam: [-2.4, 3.15, 0.45] }],
   nodes: {

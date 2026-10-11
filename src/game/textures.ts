@@ -149,51 +149,108 @@ function toTexture(c: HTMLCanvasElement, srgb = true) {
 // ---------------------------------------------------------------- surfaces
 
 function paintWall() {
+  // Hospital wall: glazed ceramic tiles up to a dado rail (~1.2m of a 4m
+  // texture), stained plaster above, water damage and mould under the ceiling.
   const S = 1024;
   const [c, ctx] = canvas(S);
-  // upper paint
-  ctx.fillStyle = "#a3a693";
-  ctx.fillRect(0, 0, S, S);
-  // wainscot (bottom ~27% of a 4m wall ≈ 1.1m)
-  const band = S * 0.73;
-  ctx.fillStyle = "#4f5c55";
-  ctx.fillRect(0, band, S, S - band);
-  ctx.fillStyle = "#2d3430";
-  ctx.fillRect(0, band - 10, S, 10);
-  ctx.fillStyle = "#6b766d";
-  ctx.fillRect(0, band - 14, S, 4);
-  // peeling patches revealing plaster
-  for (let i = 0; i < 9; i++) {
-    const x = rand() * S;
-    const y = rand() * band * 0.95;
-    const r = 18 + rand() * 46;
-    ctx.fillStyle = rand() > 0.5 ? "#857e6b" : "#928b77";
-    ctx.beginPath();
-    const n = 22;
-    for (let k = 0; k <= n; k++) {
-      const a = (k / n) * Math.PI * 2;
-      const rr = r * (0.65 + noise(i * 7 + Math.cos(a) * 2, i * 3 + Math.sin(a) * 2) * 0.7);
-      const px = x + Math.cos(a) * rr * 1.3;
-      const py = y + Math.sin(a) * rr;
-      if (k === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
+  const rail = Math.round(S * 0.7);
+  // plaster
+  ctx.fillStyle = "#a9ab9c";
+  ctx.fillRect(0, 0, S, rail);
+  // tiles
+  const T = 26; // ~10cm tiles
+  for (let y = rail; y < S; y += T)
+    for (let x = 0; x < S; x += T) {
+      const v = (rand() - 0.5) * 10;
+      ctx.fillStyle = `rgb(${118 + v},${134 + v},${124 + v})`;
+      ctx.fillRect(x, y, T, T);
+      // glaze highlight on each tile
+      ctx.fillStyle = "rgba(255,255,255,0.06)";
+      ctx.fillRect(x + 3, y + 3, T - 10, 4);
+      if (rand() < 0.035) {
+        // chipped tile showing the bed underneath
+        ctx.fillStyle = "#6d6656";
+        ctx.beginPath();
+        ctx.moveTo(x + rand() * T, y);
+        ctx.lineTo(x + T, y + rand() * T);
+        ctx.lineTo(x + T, y);
+        ctx.fill();
+      }
     }
-    ctx.closePath();
-    ctx.fill();
-    // curled paint edge: a light lip with a dark shadow under it
-    ctx.strokeStyle = "rgba(200,198,180,.35)";
-    ctx.lineWidth = 2;
+  ctx.strokeStyle = "#3b3d35";
+  ctx.lineWidth = 2;
+  for (let y = rail; y <= S; y += T) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(S, y);
     ctx.stroke();
-    ctx.translate(1.5, 2.5);
-    ctx.strokeStyle = "rgba(25,22,16,.35)";
-    ctx.stroke();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
-  drips(ctx, S, S, 160, "#3b3427", 0.8);
-  stains(ctx, S, S, 10, "rgba(70,55,30,0.6)", 90);
-  stains(ctx, S, S * 0.2, 6, "rgba(20,18,14,0.7)", 120); // ceiling-line soot
-  cracks(ctx, S, S, 12, "#2a251d");
-  grime(ctx, S, S, 6, 1.1);
+  for (let x = 0; x <= S; x += T) {
+    ctx.beginPath();
+    ctx.moveTo(x, rail);
+    ctx.lineTo(x, S);
+    ctx.stroke();
+  }
+  // dado rail
+  ctx.fillStyle = "#4b4f47";
+  ctx.fillRect(0, rail - 12, S, 12);
+  ctx.fillStyle = "#71766c";
+  ctx.fillRect(0, rail - 12, S, 3);
+  // skirting
+  ctx.fillStyle = "#2c2e29";
+  ctx.fillRect(0, S - 18, S, 18);
+  // water damage: long tea-coloured runs from the ceiling line
+  drips(ctx, S, rail, 130, "#4a3f2a", 0.9);
+  drips(ctx, S, S, 60, "#2f2a20", 0.35);
+  stains(ctx, S, S * 0.22, 9, "rgba(70,62,38,0.65)", 120);
+  stains(ctx, S, rail, 5, "rgba(55,48,30,0.5)", 90);
+  // mould bloom under the ceiling
+  for (let i = 0; i < 260; i++) {
+    ctx.fillStyle = `rgba(${30 + rand() * 20},${36 + rand() * 20},${24},${0.12 + rand() * 0.25})`;
+    ctx.beginPath();
+    ctx.arc(rand() * S, Math.pow(rand(), 3) * S * 0.25, 2 + rand() * 9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  cracks(ctx, S, rail, 10, "#2a251d");
+  // scuffs where trolleys hit the tiles
+  for (let i = 0; i < 40; i++) {
+    ctx.strokeStyle = `rgba(20,18,14,${0.15 + rand() * 0.3})`;
+    ctx.lineWidth = 1 + rand() * 2;
+    const x = rand() * S;
+    const y = rail + 80 + rand() * (S - rail - 120);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + 20 + rand() * 80, y + (rand() - 0.5) * 6);
+    ctx.stroke();
+  }
+  grime(ctx, S, S, 6, 1.0);
+  return c;
+}
+
+/** Tangent-space normal map derived from a texture's luminance (dark = recessed). */
+function normalFromCanvas(src: HTMLCanvasElement, strength: number) {
+  const w = src.width;
+  const h = src.height;
+  const sctx = src.getContext("2d")!;
+  const d = sctx.getImageData(0, 0, w, h).data;
+  const lum = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) lum[i] = (d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11) / 255;
+  const [c, ctx] = canvas(w, h);
+  const out = ctx.createImageData(w, h);
+  const o = out.data;
+  const at = (x: number, y: number) => lum[((y + h) % h) * w + ((x + w) % w)];
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const dx = (at(x + 1, y) - at(x - 1, y)) * strength;
+      const dy = (at(x, y + 1) - at(x, y - 1)) * strength;
+      const len = Math.hypot(dx, dy, 1);
+      const i = (y * w + x) * 4;
+      o[i] = ((-dx / len) * 0.5 + 0.5) * 255;
+      o[i + 1] = ((dy / len) * 0.5 + 0.5) * 255;
+      o[i + 2] = (1 / len) * 255;
+      o[i + 3] = 255;
+    }
+  ctx.putImageData(out, 0, 0);
   return c;
 }
 
@@ -517,6 +574,21 @@ export function baseTexture(key: Key): THREE.CanvasTexture {
     cache.set(key, t);
   }
   return t;
+}
+
+const normalCache = new Map<string, THREE.CanvasTexture>();
+
+/** Normal map for a painted surface, with the same repeat semantics as `tex`. */
+export function normalTex(key: Key, repeatX = 1, repeatY = 1, strength = 6): THREE.Texture {
+  let t = normalCache.get(key);
+  if (!t) {
+    t = toTexture(normalFromCanvas(baseTexture(key).image as HTMLCanvasElement, strength), false);
+    normalCache.set(key, t);
+  }
+  const n = t.clone();
+  n.repeat.set(repeatX, repeatY);
+  n.needsUpdate = true;
+  return n;
 }
 
 export function tex(key: Key, repeatX = 1, repeatY = 1): THREE.Texture {
