@@ -21,7 +21,8 @@ import { Effects } from "./scene/Effects";
 import { Interaction, WalkMarker } from "./scene/Interaction";
 import { IntroScene } from "./scene/IntroScene";
 import { Monsters } from "./scene/Monsters";
-import { Player } from "./scene/Player";
+import { LevelColliders, Player } from "./scene/Player";
+import { Physics } from "@react-three/rapier";
 import { runtime, useGame } from "./store";
 import { ENTRY_TAPE } from "./config/tapes.config";
 import { Ending, FadeLayer, Hud, nextTape, OtherworldTint, Overlays, playTape, stopTape, TearFlash, ToolOverlay } from "./ui/Hud";
@@ -75,7 +76,12 @@ function World() {
       )}
       {phase === "play" && (
         <>
-          <Player />
+          <Suspense fallback={null}>
+            <Physics gravity={[0, -9.81, 0]}>
+              <LevelColliders />
+              <Player />
+            </Physics>
+          </Suspense>
           <CameraRig />
           <Interaction />
           <WalkMarker />

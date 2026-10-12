@@ -48,12 +48,8 @@ export function CameraRig() {
       runtime.lastMouse = performance.now();
     }
 
-    // Let the camera drift behind the player when they walk without the mouse.
-    const sinceMouse = performance.now() - runtime.lastMouse;
-    if (!runtime.focus && runtime.speed > 0.5 && sinceMouse > 1500) {
-      const d = Math.atan2(Math.sin(runtime.yaw - runtime.camYaw), Math.cos(runtime.yaw - runtime.camYaw));
-      if (Math.abs(d) < 2.4) runtime.camYaw += d * (1 - Math.exp(-dt * 1.1));
-    }
+    // (No automatic drift behind the player: movement is relative to the
+    // camera, so a camera that chases the body would bend every straight walk.)
 
     head.set(runtime.pos.x, 1.55, runtime.pos.z);
     let k = 6;
