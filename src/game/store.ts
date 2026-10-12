@@ -143,8 +143,9 @@ export const useGame = create<GameState>((set, get) => ({
   hurt: (n) => {
     const s = get();
     if (s.dead || s.activeTool || s.overlay) return;
-    const health = Math.max(0, s.health - n);
-    set({ health, hurtAt: performance.now(), dead: health <= 0 });
+    // you can be hurt, but never die: the hit is felt, not counted
+    void n;
+    set({ hurtAt: performance.now() });
   },
   heal: (n) => set((s) => ({ health: Math.min(100, s.health + n) })),
   revive: () => set({ health: 100, dead: false }),
