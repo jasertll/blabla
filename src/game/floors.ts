@@ -206,7 +206,7 @@ export const WARD_SPECS: Record<"3F" | "4F" | "B1" | "B2", WardSpec> = {
       { room: "401", side: -1, object: "corkboard", label: "Follow the red string", toolId: "intel-graph" },
       { room: "402", side: 1, object: "ticker", label: "Read the ticker tape", toolId: "xau-usd" },
       { room: "403", side: -1, object: "anatomy", label: "Examine the anatomy chart", toolId: "mitre" },
-      { room: "DIR", side: 1, object: "desk", label: "The director's desk", memo: { id: "director-lantern", label: "Read the letter on the desk" }, writing: "LANTERN SEES" },
+      { room: "DIR", side: 1, object: "desk", label: "The director's desk", memo: { id: "director-lantern", label: "Read the papers on the desk" }, writing: "LANTERN SEES" },
     ],
   },
   B1: {
@@ -235,7 +235,7 @@ export const WARD_SPECS: Record<"3F" | "4F" | "B1" | "B2", WardSpec> = {
     sign: "ARCHIVE  ·  LABORATORIES",
     tail: 2,
     rooms: [
-      { room: "ARC", side: -1, object: "shelves", label: "Search the shelves", toolId: "library", memo: { id: "elena-tape", label: "Play the tape transcript" } },
+      { room: "ARC", side: -1, object: "shelves", label: "Search the shelves", toolId: "library", memo: { id: "elena-tape", label: "Open the locked reel case" } },
       { room: "B201", side: 1, object: "birdcage", label: "Open the birdcage", toolId: "canary" },
       { room: "B202", side: -1, object: "press", label: "Work the printing press", toolId: "pdf" },
       { room: "B203", side: 1, object: "stamp", label: "Use the notary stamp", toolId: "c2pa" },

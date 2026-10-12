@@ -67,7 +67,7 @@ interface GameState {
   /** Story beats that have happened (saved). */
   flags: string[];
   flag: (f: string) => void;
-  overlay: null | "map" | "cassette" | "memo" | "elevator" | "settings";
+  overlay: null | "map" | "cassette" | "memo" | "elevator" | "settings" | "case" | "keypad";
   fade: number;
   quality: Quality;
   muted: boolean;

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { audio } from "./audio";
 import { answerPhone, cellText, mirrorChange } from "./events";
+import { caseSolved, grantEvidence } from "./evidence/case";
 import { findPath, layoutFor, nearestNode, type Interactable } from "./level";
 import { runtime, useGame, type PlayFloor } from "./store";
 
@@ -88,7 +89,17 @@ export function interact(i: Interactable) {
       if (i.text) g.say(i.text);
       break;
     case "memo":
+      if (i.id === "elena-tape" && !g.flags.includes("archive-open")) {
+        audio.locked();
+        g.setOverlay("keypad");
+        break;
+      }
+      if (i.id === "elena-final" && !caseSolved(g.flags)) {
+        g.say("A note, soaked through. The ink runs whenever I try to read it. Not yet. I don't know enough yet.");
+        break;
+      }
       audio.blip();
+      grantEvidence(i.id);
       runtime.memoId = i.id;
       g.flag(`read:${i.id}`);
       g.setOverlay("memo");
@@ -111,7 +122,13 @@ export function interact(i: Interactable) {
 
 export function closeOverlay() {
   runtime.focus = null;
-  useGame.getState().setOverlay(null);
+  const g = useGame.getState();
+  const endingNow = g.overlay === "memo" && runtime.memoId === "elena-final" && !g.flags.includes("ending");
+  g.setOverlay(null);
+  if (endingNow) {
+    audio.stinger();
+    window.setTimeout(() => useGame.getState().flag("ending"), 1800);
+  }
 }
 
 /** The siren wails, then the world peels away for a while. */

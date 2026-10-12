@@ -112,7 +112,7 @@ const LOBBY: FloorLayout = {
       label: "Use the cassette recorder",
       focus: { cam: [-3.1, 1.75, -2.55], look: [-3.1, 1.12, -3.95] },
     },
-    { id: "memo-lobby", kind: "memo", at: [-8.5, 1.5], radius: 1.2, label: "Read the note" },
+    { id: "memo-lobby", kind: "memo", at: [-8.5, 1.5], radius: 1.2, label: "Read the letter again" },
     { id: "save-lobby", kind: "save", at: [-9, -5], radius: 1.3, label: "Touch the red square" },
     { id: "elevator-1f", kind: "elevator", at: [9.2, 0], radius: 1.4, label: "Call the elevator" },
     { id: "clock-1f", kind: "message", at: [5.2, -7.1], radius: 1.1, label: "Look at the clock", text: "It stopped at 4:17. The letter was postmarked 4:17 too." },

@@ -8,6 +8,9 @@ import { FLOORS, TOOLS, toolById } from "../config/rooms.config";
 import { TAPES } from "../config/tapes.config";
 import { FLOOR_LAYOUTS, layoutFor, nearestNode, type BuiltFloor } from "../level";
 import { MEMOS } from "../config/story";
+import { CASE } from "../evidence/case";
+import { CaseFileOverlay, EvidenceBar, KeypadOverlay } from "./CaseFile";
+import { getApiBase, isStatic, setApiBase } from "../apiBase";
 import { runtime, useGame, type PlayFloor } from "../store";
 
 // ------------------------------------------------------------------ HUD
@@ -31,6 +34,7 @@ export function Hud() {
     <div className="pointer-events-none absolute inset-0 z-20 select-none">
       <Location floor={floor} />
       <div className={`pointer-events-auto absolute right-3 top-3 flex gap-2 transition-opacity ${busy ? "opacity-0" : "opacity-100"}`}>
+        <HudButton label="CASE FILE" hotkey="C" onClick={() => useGame.getState().setOverlay("case")} />
         <HudButton label="MAP" hotkey="M" onClick={() => useGame.getState().setOverlay("map")} />
         <HudButton label={nightmare ? "WAKE UP" : "NIGHTMARE"} hotkey="N" danger={nightmare} onClick={toggleNightmare} />
         <HudButton label={muted ? "SOUND OFF" : "SOUND ON"} onClick={() => useGame.getState().toggleMute()} />
@@ -47,7 +51,7 @@ export function Hud() {
       <Radio />
       {hint && !busy && (
         <div className="absolute bottom-4 left-4 max-w-[90vw] font-mono text-[11px] leading-relaxed tracking-wider text-white/45">
-          MOUSE look · CLICK the floor to walk · WASD move · SHIFT run · E examine · M map · N nightmare · T next song · P pause music
+          MOUSE look · CLICK the floor to walk · WASD move · SHIFT run · E examine · C case file · M map · N nightmare · T next song · P pause music
         </div>
       )}
       <MiniPlayer />
@@ -173,17 +177,29 @@ export function Overlays() {
       return <ElevatorPanel />;
     case "settings":
       return <SettingsOverlay />;
+    case "case":
+      return <CaseFileOverlay />;
+    case "keypad":
+      return <KeypadOverlay />;
   }
 }
 
 function MemoOverlay() {
   const memo = MEMOS[runtime.memoId] ?? MEMOS["memo-lobby"];
+  const evidence = CASE.find((e) => e.foundIn === runtime.memoId);
   return (
     <div className="panel-in pointer-events-auto absolute inset-0 z-30 flex items-center justify-center bg-black/70 p-4" onClick={closeOverlay}>
       <div onClick={(e) => e.stopPropagation()} className="memo relative w-full max-w-md rotate-[-1.2deg] p-8 font-typewriter text-[15px] leading-7 text-[#2a241a]">
         <p className="mb-4 text-right text-xs">— {memo.found}</p>
         {memo.body}
         {memo.sign && <p className="mt-5 text-right font-hand text-2xl text-[#5a1a10]">{memo.sign}</p>}
+        {evidence && (
+          <div className="mt-6 border-t border-dashed border-[#2a241a]/40 pt-3 text-[13px] leading-5">
+            <p className="tracking-[0.3em] text-[#7a1a10]">EVIDENCE ADDED TO THE CASE FILE</p>
+            <p className="mt-1 font-bold">{evidence.file}</p>
+            <p>Examine it with the {toolById(evidence.tool)?.name} ({toolById(evidence.tool)?.floor} · {toolById(evidence.tool)?.room}).</p>
+          </div>
+        )}
         <button onClick={closeOverlay} className="absolute -bottom-10 left-1/2 -translate-x-1/2 font-display text-sm tracking-[0.3em] text-white/60">
           CLOSE
         </button>
@@ -227,6 +243,40 @@ function ElevatorPanel() {
   );
 }
 
+/** Where the online tools send their lookups (only needed on the static copy). */
+function ApiServerField() {
+  const [value, setValue] = useState(getApiBase());
+  const [saved, setSaved] = useState(false);
+  return (
+    <div>
+      <p className="mb-2 text-sm text-white/50">TOOLS SERVER</p>
+      <div className="flex gap-2">
+        <input
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setSaved(false);
+          }}
+          placeholder={isStatic() ? "https://your-deployment.vercel.app" : "this site (default)"}
+          className="min-w-0 flex-1 border border-white/20 bg-black/40 px-3 py-2 font-mono text-sm tracking-normal text-white outline-none focus:border-white/60"
+        />
+        <button
+          onClick={() => {
+            setApiBase(value);
+            setSaved(true);
+          }}
+          className="border border-white/25 px-4 py-2"
+        >
+          {saved ? "SAVED" : "SAVE"}
+        </button>
+      </div>
+      <p className="mt-2 text-xs normal-case tracking-normal text-white/40">
+        Online lookups (IP, domain, username, certificates…) need the app&apos;s server. Leave empty on the deployed site.
+      </p>
+    </div>
+  );
+}
+
 function SettingsOverlay() {
   const quality = useGame((s) => s.quality);
   const muted = useGame((s) => s.muted);
@@ -252,6 +302,7 @@ function SettingsOverlay() {
             {muted ? "OFF" : "ON"}
           </button>
         </div>
+        <ApiServerField />
         <div className="flex items-center justify-between">
           <p className="text-sm text-white/50">SAVE DATA</p>
           <button
@@ -512,6 +563,8 @@ export function ToolOverlay() {
             BACK <span className="ml-1 font-mono text-white/30">ESC</span>
           </button>
         </header>
+        <EvidenceBar toolId={tool.id} />
+        <ServerNotice refId={tool.ref} />
         <div className="tool-scope relative min-h-0 flex-1 overflow-auto p-4 sm:p-5">
           <ToolView refId={tool.ref} name={tool.name} />
         </div>
@@ -593,6 +646,47 @@ export function Voice() {
     <div key={voice.id} className="panel-in pointer-events-none absolute bottom-[30vh] left-1/2 w-[min(90vw,760px)] -translate-x-1/2 text-center">
       <p className="font-mono text-[10px] tracking-[0.5em] text-red-400/70">{voice.who}</p>
       <p className="mt-1 font-typewriter text-[clamp(1rem,1.9vw,1.3rem)] text-[#e8a79d] [text-shadow:0_0_14px_#000,0_0_3px_#400]">{voice.text}</p>
+    </div>
+  );
+}
+
+/** Tools that look things up online need the app's server. */
+const ONLINE = new Set(["ip", "domain", "webapp", "camera", "certwatch", "surface", "username", "recon", "exposure", "space", "gold", "canary", "imageintel", "overview", "graph"]);
+
+function ServerNotice({ refId }: { refId: string }) {
+  const [open, setOpen] = useState(true);
+  if (!open || !ONLINE.has(refId) || !isStatic() || getApiBase()) return null;
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-amber-700/40 bg-amber-950/30 px-5 py-2 font-typewriter text-[13px] leading-5 text-amber-100/85">
+      <p>
+        This instrument looks things up on the internet through the hospital&apos;s server. This copy has no server, so online lookups will fail.
+        Open the deployed site, or set its address under ⚙ Settings → Tools server.
+      </p>
+      <button onClick={() => setOpen(false)} className="shrink-0 text-white/50 hover:text-white">
+        ✕
+      </button>
+    </div>
+  );
+}
+
+/** After the last note: the light goes out, and the hospital lets you go. */
+export function Ending() {
+  const ending = useGame((s) => s.flags.includes("ending") && !s.flags.includes("ending-seen"));
+  if (!ending) return null;
+  return (
+    <div className="ending pointer-events-auto absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#e9e6dc] px-6 text-center text-[#1b1a16]">
+      <p className="font-typewriter text-sm tracking-[0.5em] text-[#7a1a10]">LANTERN · kill_switch=candle · ACCEPTED</p>
+      <h2 className="mt-6 font-display text-[clamp(2rem,6vw,4.5rem)] tracking-[0.12em]">Leave a light on.</h2>
+      <p className="mt-6 max-w-xl font-display text-xl italic leading-8 text-[#3a3830]">
+        Every device that touched that network is free of it now. Including yours. The fog will still be there tomorrow. So will the
+        instruments. The truth was always in the data. You just had to look at your own.
+      </p>
+      <button
+        onClick={() => useGame.getState().flag("ending-seen")}
+        className="mt-10 border border-[#1b1a16]/50 px-6 py-2 font-display tracking-[0.35em] hover:bg-[#1b1a16] hover:text-[#e9e6dc]"
+      >
+        STAY A WHILE
+      </button>
     </div>
   );
 }

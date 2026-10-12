@@ -13,6 +13,9 @@ import { Lobby, ScreenTicker, Shell, Ward } from "./scene/Building";
 import { GenericWard, Roof } from "./scene/Wards";
 import { WARD_SPECS } from "./floors";
 import { arriveOn } from "./events";
+import { installApiBase } from "./apiBase";
+
+installApiBase();
 import { CameraRig } from "./scene/CameraRig";
 import { Effects } from "./scene/Effects";
 import { Interaction, WalkMarker } from "./scene/Interaction";
@@ -21,7 +24,7 @@ import { Monsters } from "./scene/Monsters";
 import { Player } from "./scene/Player";
 import { runtime, useGame } from "./store";
 import { ENTRY_TAPE } from "./config/tapes.config";
-import { FadeLayer, Hud, nextTape, OtherworldTint, Overlays, playTape, stopTape, TearFlash, ToolOverlay } from "./ui/Hud";
+import { Ending, FadeLayer, Hud, nextTape, OtherworldTint, Overlays, playTape, stopTape, TearFlash, ToolOverlay } from "./ui/Hud";
 import { IntroOverlay, StormCinematic, TitleScreen } from "./ui/Title";
 
 function finishIntro() {
@@ -45,6 +48,11 @@ function finishIntro() {
   window.setTimeout(() => {
     useGame.getState().say("Elena, I came. I've never been inside this place… so why do I know where the elevator is?");
   }, 3200);
+  window.setTimeout(() => {
+    const s = useGame.getState();
+    s.flag("has:letter");
+    s.say("Her letter. Before I look for her, I should look at where it really came from.  [C — case file]");
+  }, 8200);
 }
 
 function World() {
@@ -93,6 +101,11 @@ export default function Game() {
       if (e.code === "Escape") {
         if (g.activeTool) g.closeTool();
         else if (g.overlay) closeOverlay();
+        return;
+      }
+      if (e.code === "KeyC" && !g.activeTool) {
+        if (g.overlay === "case") closeOverlay();
+        else if (!g.overlay) g.setOverlay("case");
         return;
       }
       if (e.code === "KeyM" && !g.activeTool) {
@@ -202,6 +215,7 @@ export default function Game() {
           <Hud />
           <ToolOverlay />
           <Overlays />
+          <Ending />
         </>
       )}
       <TearFlash />
