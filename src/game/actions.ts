@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { audio } from "./audio";
 import { answerPhone, cellText, mirrorChange } from "./events";
 import { caseSolved, grantEvidence } from "./evidence/case";
+import { startDialogue } from "./scene/People";
 import { findPath, layoutFor, nearestNode, type Interactable } from "./level";
 import { runtime, useGame, type PlayFloor } from "./store";
 
@@ -120,6 +121,9 @@ export function interact(i: Interactable) {
       g.heal(45);
       audio.blip();
       g.say(g.health >= 100 ? "A health drink. Bitter, like old pennies. I feel steadier." : "A health drink. The shaking in my hands eases a little.");
+      break;
+    case "npc":
+      startDialogue(i.id.slice(4), i.at);
       break;
     case "phone":
       answerPhone();

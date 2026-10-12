@@ -76,7 +76,10 @@ interface GameState {
   /** Story beats that have happened (saved). */
   flags: string[];
   flag: (f: string) => void;
-  overlay: null | "map" | "cassette" | "memo" | "elevator" | "settings" | "case" | "keypad";
+  overlay: null | "map" | "cassette" | "memo" | "elevator" | "settings" | "case" | "keypad" | "dialogue";
+  /** The conversation in progress. */
+  dialogue: { id: string; node: string; line: number } | null;
+  setDialogue: (d: GameState["dialogue"]) => void;
   fade: number;
   quality: Quality;
   /** PlayStation-era rendering: low resolution, dithered colour, wobbling vertices. */
@@ -153,6 +156,8 @@ export const useGame = create<GameState>((set, get) => ({
     if (!get().flags.includes(f)) set((s) => ({ flags: [...s.flags, f] }));
   },
   overlay: null,
+  dialogue: null,
+  setDialogue: (dialogue) => set({ dialogue }),
   fade: 0,
   quality: "medium",
   retro: (() => {

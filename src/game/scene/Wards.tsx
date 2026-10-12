@@ -247,7 +247,7 @@ function CellFigure({ at }: { at: [number, number] }) {
   useFrame(({ clock }, dt) => {
     elena.breathe(clock.elapsedTime);
     // shoulders trembling
-    elena.bones.mixamorigSpine2?.rotateZ(Math.sin(clock.elapsedTime * 11) * 0.01);
+    elena.bones.Spine2?.rotateZ(Math.sin(clock.elapsedTime * 11) * 0.01);
     const s = st.current;
     v.set(at[0], 1.2, at[1]).project(camera);
     const inView = v.z < 1 && Math.abs(v.x) < 0.85 && Math.abs(v.y) < 0.9;
@@ -391,7 +391,7 @@ function LedgeFigure({ at }: { at: [number, number] }) {
   const op = useRef(1);
   useFrame(({ clock }, dt) => {
     elena.breathe(clock.elapsedTime);
-    elena.bones.mixamorigHead?.rotateY(Math.sin(clock.elapsedTime * 0.3) * 0.1);
+    elena.bones.Head?.rotateY(Math.sin(clock.elapsedTime * 0.3) * 0.1);
     const d = Math.hypot(at[0] - runtime.pos.x, at[1] - runtime.pos.z);
     const want = d < 6 ? 0 : 1;
     op.current += (want - op.current) * (1 - Math.exp(-dt * (want ? 0.3 : 2.5)));

@@ -11,6 +11,7 @@ import { layoutFor } from "./level";
 import { Atmosphere, Dust } from "./scene/Atmosphere";
 import { Lobby, ScreenTicker, Shell, Ward } from "./scene/Building";
 import { GenericWard, Roof } from "./scene/Wards";
+import { dialogueClock, People } from "./scene/People";
 import { WARD_SPECS } from "./floors";
 import { arriveOn } from "./events";
 import { attack, foes } from "./combat";
@@ -72,6 +73,7 @@ function World() {
         <group key={floor}>
           <Shell layout={layout} />
           {floor === "1F" ? <Lobby /> : floor === "2F" ? <Ward /> : floor === "ROOF" ? <Roof /> : <GenericWard spec={WARD_SPECS[floor as keyof typeof WARD_SPECS]} />}
+          <People floor={floor} />
           <Suspense fallback={null}>
             <Monsters floor={floor} />
           </Suspense>
@@ -110,7 +112,11 @@ export default function Game() {
       if (g.phase !== "play") return;
       if (e.code === "Escape") {
         if (g.activeTool) g.closeTool();
-        else if (g.overlay) closeOverlay();
+        else if (g.overlay === "dialogue") {
+          dialogueClock.endedAt = performance.now();
+          g.setDialogue(null);
+          closeOverlay();
+        } else if (g.overlay) closeOverlay();
         return;
       }
       if (e.code === "KeyC" && !g.activeTool) {

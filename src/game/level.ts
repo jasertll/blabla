@@ -17,7 +17,7 @@ export interface Box {
   max: V2;
 }
 
-export type InteractKind = "tool" | "elevator" | "locked" | "memo" | "save" | "cassette" | "message" | "phone" | "item";
+export type InteractKind = "tool" | "elevator" | "locked" | "memo" | "save" | "cassette" | "message" | "phone" | "item" | "npc";
 
 export interface Interactable {
   id: string;

@@ -5,6 +5,8 @@ import { useRef } from "react";
 import * as THREE from "three";
 import { layoutFor } from "../level";
 import { runtime, useGame } from "../store";
+import { npcSpots } from "./People";
+import type { Interactable } from "../level";
 
 /** Finds the interactable in reach and surfaces its prompt. */
 export function Interaction() {
@@ -16,7 +18,7 @@ export function Interaction() {
       g.setPrompt(null);
       return;
     }
-    let best = null;
+    let best: Interactable | null = null;
     let bd = Infinity;
     for (const i of layout.interactables) {
       if (i.kind === "item" && g.flags.includes(`took:${i.id}`)) continue;
@@ -24,6 +26,13 @@ export function Interaction() {
       if (d < i.radius && d < bd) {
         bd = d;
         best = i;
+      }
+    }
+    for (const [id, n] of npcSpots) {
+      const d = Math.hypot(n.x - runtime.pos.x, n.z - runtime.pos.z);
+      if (d < 2 && d < bd) {
+        bd = d;
+        best = { id: `npc:${id}`, kind: "npc", at: [n.x, n.z], radius: 2, label: n.label };
       }
     }
     runtime.near = best;

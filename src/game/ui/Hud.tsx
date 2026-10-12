@@ -10,6 +10,7 @@ import { FLOOR_LAYOUTS, layoutFor, nearestNode, type BuiltFloor } from "../level
 import { MEMOS } from "../config/story";
 import { CASE } from "../evidence/case";
 import { CaseFileOverlay, EvidenceBar, KeypadOverlay } from "./CaseFile";
+import { DialogueOverlay } from "./Dialogue";
 import { getApiBase, isStatic, setApiBase } from "../apiBase";
 import { runtime, useGame, type PlayFloor } from "../store";
 
@@ -46,8 +47,12 @@ export function Hud() {
           {prompt}
         </div>
       )}
-      <Message />
-      <Voice />
+      {overlay !== "dialogue" && (
+        <>
+          <Message />
+          <Voice />
+        </>
+      )}
       <Radio />
       {hint && !busy && (
         <div className="absolute bottom-4 left-4 max-w-[90vw] font-mono text-[11px] leading-relaxed tracking-wider text-white/45">
@@ -181,6 +186,8 @@ export function Overlays() {
       return <CaseFileOverlay />;
     case "keypad":
       return <KeypadOverlay />;
+    case "dialogue":
+      return <DialogueOverlay />;
   }
 }
 

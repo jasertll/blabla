@@ -203,24 +203,34 @@ export const ELENA_URL = "models/elena.glb";
  *  skeleton; rotations only, so proportions stay hers). Materials are cloned
  *  and transparent so she can fade. */
 export function useElena(clips: string[] = ["idle"]) {
-  const body = use(loadGLTF(ELENA_URL));
-  const moves = use(loadGLTF(CREATURE_URL));
+  void clips;
+  return usePerson(ELENA_URL, { ghost: true, headDown: true });
+}
+
+export const WALTER_URL = "models/walter.glb";
+
+/** A rigged person posed from their bind (T) pose: arms hanging, elbows soft,
+ *  breathing. Bone names are normalised (Mixamo's "mixamorig" prefix or none).
+ *  `ghost` drains the colour and lets them fade. */
+export function usePerson(url: string, o: { ghost?: boolean; headDown?: boolean } = {}) {
+  const body = use(loadGLTF(url));
   const rig = useMemo(() => {
     const model = clone(body.scene);
     const mats: THREE.MeshStandardMaterial[] = [];
-    model.traverse((o) => {
-      const m = o as THREE.Mesh;
+    model.traverse((obj) => {
+      const m = obj as THREE.Mesh;
       if (m.isMesh) {
         const mat = (m.material as THREE.MeshStandardMaterial).clone();
-        mat.transparent = true;
-        mat.roughness = 0.85;
-        // drained of colour: a photograph left in the sun
-        mat.onBeforeCompile = (sh) => {
-          sh.fragmentShader = sh.fragmentShader.replace(
-            "#include <map_fragment>",
-            "#include <map_fragment>\n  float g = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(g) * vec3(0.86, 0.92, 0.9), 0.85);",
-          );
-        };
+        mat.transparent = !!o.ghost;
+        mat.roughness = Math.max(0.6, mat.roughness ?? 0.8);
+        if (o.ghost)
+          // drained of colour: a photograph left in the sun
+          mat.onBeforeCompile = (sh) => {
+            sh.fragmentShader = sh.fragmentShader.replace(
+              "#include <map_fragment>",
+              "#include <map_fragment>\n  float g = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(g) * vec3(0.86, 0.92, 0.9), 0.85);",
+            );
+          };
         m.material = mat;
         mats.push(mat);
         m.castShadow = true;
@@ -228,11 +238,9 @@ export function useElena(clips: string[] = ["idle"]) {
       }
     });
     const bones: Record<string, THREE.Bone> = {};
-    model.traverse((o) => {
-      if ((o as THREE.Bone).isBone) bones[o.name] = o as THREE.Bone;
+    model.traverse((obj) => {
+      if ((obj as THREE.Bone).isBone) bones[obj.name.replace(/^mixamorig:?/, "")] = obj as THREE.Bone;
     });
-    // Pose her from the bind (T) pose by aiming limbs in model space: arms
-    // hanging, elbows soft, head bowed. Breathing is added per frame.
     model.updateMatrixWorld(true);
     const aim = (bone?: THREE.Bone, child?: THREE.Object3D, dir?: THREE.Vector3) => {
       if (!bone || !child || !dir) return;
@@ -246,26 +254,24 @@ export function useElena(clips: string[] = ["idle"]) {
       bone.updateMatrixWorld(true);
     };
     const B = bones;
-    aim(B.mixamorigLeftArm, B.mixamorigLeftForeArm, new THREE.Vector3(0.16, -1, 0.06));
-    aim(B.mixamorigRightArm, B.mixamorigRightForeArm, new THREE.Vector3(-0.16, -1, 0.06));
-    aim(B.mixamorigLeftForeArm, B.mixamorigLeftHand, new THREE.Vector3(0.08, -1, 0.22));
-    aim(B.mixamorigRightForeArm, B.mixamorigRightHand, new THREE.Vector3(-0.08, -1, 0.22));
-    aim(B.mixamorigHead, B.mixamorigHeadTop_End, new THREE.Vector3(0, 0.82, 0.55));
+    aim(B.LeftArm, B.LeftForeArm, new THREE.Vector3(0.16, -1, 0.06));
+    aim(B.RightArm, B.RightForeArm, new THREE.Vector3(-0.16, -1, 0.06));
+    aim(B.LeftForeArm, B.LeftHand, new THREE.Vector3(0.08, -1, 0.22));
+    aim(B.RightForeArm, B.RightHand, new THREE.Vector3(-0.08, -1, 0.22));
+    if (o.headDown) aim(B.Head, B.HeadTop_End, new THREE.Vector3(0, 0.82, 0.55));
     const rest: Record<string, THREE.Quaternion> = {};
     for (const [n, b] of Object.entries(B)) rest[n] = b.quaternion.clone();
     const mixer = new THREE.AnimationMixer(model);
-    void clips;
     return { model, mixer, mats, bones, rest };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [body, moves]);
+  }, [body, o.ghost, o.headDown]);
   useEffect(() => () => void rig.mixer.stopAllAction(), [rig]);
-  /** Reset to her pose; callers then add their own small motions. */
+  /** Reset to the pose; callers then add their own small motions. */
   const breathe = (t: number) => {
     for (const [n, q] of Object.entries(rig.rest)) rig.bones[n].quaternion.copy(q);
     const s = Math.sin(t * 1.6);
-    rig.bones.mixamorigSpine1?.rotateX(s * 0.015);
-    rig.bones.mixamorigLeftShoulder?.rotateZ(s * 0.01);
-    rig.bones.mixamorigRightShoulder?.rotateZ(-s * 0.01);
+    rig.bones.Spine1?.rotateX(s * 0.015);
+    rig.bones.LeftShoulder?.rotateZ(s * 0.01);
+    rig.bones.RightShoulder?.rotateZ(-s * 0.01);
   };
   const setOpacity = (v: number) => {
     for (const m of rig.mats) m.opacity = v;
