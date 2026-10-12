@@ -12,7 +12,7 @@ import { M } from "../materials";
 import { runtime, useGame } from "../store";
 import { baseTexture, writingTexture } from "../textures";
 import { Decal, Door, ElevatorDoors, Fluorescent, Gurney, Wheelchair } from "./Building";
-import { CREATURE_URL } from "./Creature";
+import { useElena } from "./Creature";
 import { Instrument, Lamp, Sheet } from "./Instruments";
 import { BarredWindow, BedsideCabinet, BrokenCeiling, FireCabinet, Handrail, HangingSign, HospitalBed, IVStand, LinenCart, NoticeBoard, WallClock, Wardrobe } from "./Props";
 
@@ -239,37 +239,15 @@ function Cell({ zBars, zEnd }: { zBars: number; zEnd: number }) {
 }
 
 function CellFigure({ at }: { at: [number, number] }) {
-  const gltf = use(loadGLTF(CREATURE_URL));
   const camera = useThree((s) => s.camera);
-  const rig = useMemo(() => {
-    const model = clone(gltf.scene);
-    model.scale.setScalar(0.98);
-    const bones: Record<string, THREE.Bone> = {};
-    model.traverse((o) => {
-      if ((o as THREE.Bone).isBone) bones[o.name] = o as THREE.Bone;
-      const m = o as THREE.Mesh;
-      if (m.isMesh) {
-        m.material = gown;
-        m.castShadow = true;
-        m.frustumCulled = false;
-      }
-    });
-    const mixer = new THREE.AnimationMixer(model);
-    const idle = gltf.animations.find((a) => a.name === "idle");
-    if (idle) mixer.clipAction(idle).play();
-    return { model, mixer, bones };
-  }, [gltf]);
+  const elena = useElena(["idle", "sad_pose"]);
   const st = useRef({ seen: 0, away: 0, fading: false });
   const v = useMemo(() => new THREE.Vector3(), []);
-  useEffect(() => {
-    gown.opacity = 1;
-  }, []);
 
   useFrame(({ clock }, dt) => {
-    rig.mixer.update(dt * 0.4);
-    const b = rig.bones;
-    b.mixamorigHead?.rotation.set(0.55 + Math.sin(clock.elapsedTime * 0.7) * 0.03, 0, 0.15);
-    b.mixamorigSpine2?.rotation.set(0.15, 0, Math.sin(clock.elapsedTime * 9) * 0.01);
+    elena.breathe(clock.elapsedTime);
+    // shoulders trembling
+    elena.bones.mixamorigSpine2?.rotateZ(Math.sin(clock.elapsedTime * 11) * 0.01);
     const s = st.current;
     v.set(at[0], 1.2, at[1]).project(camera);
     const inView = v.z < 1 && Math.abs(v.x) < 0.85 && Math.abs(v.y) < 0.9;
@@ -279,14 +257,14 @@ function CellFigure({ at }: { at: [number, number] }) {
     else s.away = 0;
     if (s.away > 0.5 && !s.fading) {
       s.fading = true;
-      gown.opacity = 0;
+      elena.setOpacity(0);
       cellEmptied();
     }
   });
 
   return (
     <group position={[at[0], 0, at[1]]} rotation={[0, Math.PI, 0]}>
-      <primitive object={rig.model} />
+      <primitive object={elena.model} />
     </group>
   );
 }
@@ -409,35 +387,19 @@ function Arcade({ position }: { position: V3 }) {
 
 /** Someone standing on the parapet, facing the fog. Gone before you reach them. */
 function LedgeFigure({ at }: { at: [number, number] }) {
-  const gltf = use(loadGLTF(CREATURE_URL));
-  const mat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#2b2e2c", roughness: 1, transparent: true }), []);
-  const rig = useMemo(() => {
-    const m = clone(gltf.scene);
-    m.traverse((o) => {
-      const mesh = o as THREE.Mesh;
-      if (mesh.isMesh) {
-        mesh.material = mat;
-        mesh.frustumCulled = false;
-      }
-    });
-    const mixer = new THREE.AnimationMixer(m);
-    const idle = gltf.animations.find((a) => a.name === "idle");
-    if (idle) mixer.clipAction(idle).play();
-    const sad = gltf.animations.find((a) => a.name === "sad_pose");
-    if (sad) mixer.clipAction(sad).play();
-    return { m, mixer };
-  }, [gltf, mat]);
-  useFrame((_, dt) => {
-    rig.mixer.update(dt);
-    const model = rig.m;
+  const elena = useElena(["idle"]);
+  const op = useRef(1);
+  useFrame(({ clock }, dt) => {
+    elena.breathe(clock.elapsedTime);
+    elena.bones.mixamorigHead?.rotateY(Math.sin(clock.elapsedTime * 0.3) * 0.1);
     const d = Math.hypot(at[0] - runtime.pos.x, at[1] - runtime.pos.z);
     const want = d < 6 ? 0 : 1;
-    mat.opacity += (want - mat.opacity) * (1 - Math.exp(-dt * (want ? 0.3 : 2.5)));
-    model.visible = mat.opacity > 0.02;
+    op.current += (want - op.current) * (1 - Math.exp(-dt * (want ? 0.3 : 2.5)));
+    elena.setOpacity(op.current);
   });
   return (
     <group position={[at[0], 1.15, at[1]]} rotation={[0, Math.PI, 0]}>
-      <primitive object={rig.m} />
+      <primitive object={elena.model} />
     </group>
   );
 }

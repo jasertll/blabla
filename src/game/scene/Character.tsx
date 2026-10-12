@@ -1,7 +1,9 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef, type RefObject } from "react";
+import { Suspense, use, useEffect, useMemo, useRef, type RefObject } from "react";
+import { loadGLTF } from "../assets";
+import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import * as THREE from "three";
 
 export interface Pose {
@@ -63,7 +65,7 @@ function Limb({ len, radius, mat, children }: { len: number; radius: number; mat
   );
 }
 
-export function Character({ pose, flashlight = true, shadowSize = 1024 }: { pose: RefObject<Pose>; flashlight?: boolean; shadowSize?: number }) {
+function ProceduralCharacter({ pose, flashlight = true, shadowSize = 1024 }: { pose: RefObject<Pose>; flashlight?: boolean; shadowSize?: number }) {
   const root = useRef<THREE.Group>(null!);
   const torso = useRef<THREE.Group>(null!);
   const thighL = useRef<THREE.Group>(null!);
@@ -245,6 +247,127 @@ export function Character({ pose, flashlight = true, shadowSize = 1024 }: { pose
             <sphereGeometry args={[0.068, 12, 8]} />
           </mesh>
         </group>
+      </group>
+    </group>
+  );
+}
+
+// ------------------------------------------------------------------ the rigged hero
+
+export const HERO_URL = "models/soldier.glb";
+
+/** The player: a rigged, motion-captured body (idle / walk / run blended by
+ *  speed), with the old procedural figure standing in while it loads. */
+export function Character({ pose, flashlight = true, shadowSize = 1024 }: { pose: RefObject<Pose>; flashlight?: boolean; shadowSize?: number }) {
+  return (
+    <group>
+      <Suspense fallback={<ProceduralCharacter pose={pose} flashlight={false} />}>
+        <HeroBody pose={pose} />
+      </Suspense>
+      {flashlight && <Flashlight pose={pose} shadowSize={shadowSize} />}
+    </group>
+  );
+}
+
+function HeroBody({ pose }: { pose: RefObject<Pose> }) {
+  const gltf = use(loadGLTF(HERO_URL));
+  const rig = useMemo(() => {
+    const model = cloneSkinned(gltf.scene);
+    model.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        m.castShadow = true;
+        m.receiveShadow = true;
+        m.frustumCulled = false;
+        const mat = m.material as THREE.MeshStandardMaterial;
+        // weathered: no plastic sheen in a hospital this dark
+        mat.roughness = Math.max(mat.roughness ?? 0.8, 0.7);
+        mat.metalness = Math.min(mat.metalness ?? 0, 0.15);
+        // the parade-ground tan becomes worn olive field gear
+        mat.color.set("#7c8a5e");
+        if (/visor/i.test(m.name)) m.visible = false;
+      }
+    });
+    const mixer = new THREE.AnimationMixer(model);
+    const clip = (n: string) => gltf.animations.find((a) => a.name === n)!;
+    const idle = mixer.clipAction(clip("Idle"));
+    const walk = mixer.clipAction(clip("Walk"));
+    const run = mixer.clipAction(clip("Run"));
+    [idle, walk, run].forEach((a) => {
+      a.play();
+      a.setEffectiveWeight(0);
+    });
+    idle.setEffectiveWeight(1);
+    return { model, mixer, idle, walk, run };
+  }, [gltf]);
+  useEffect(() => () => void rig.mixer.stopAllAction(), [rig]);
+
+  useFrame((_, dt) => {
+    const a = pose.current.amount; // 0 idle, 1 walk, ~2.2 run
+    const w = Math.min(1, a);
+    const r = THREE.MathUtils.clamp((a - 1.1) / 0.8, 0, 1);
+    rig.idle.setEffectiveWeight(1 - w);
+    rig.walk.setEffectiveWeight(w * (1 - r));
+    rig.run.setEffectiveWeight(w * r);
+    // keep feet planted: playback rate follows ground speed
+    rig.walk.setEffectiveTimeScale(0.75 + Math.min(a, 1.2) * 0.35);
+    rig.run.setEffectiveTimeScale(0.8 + r * 0.25);
+    rig.mixer.update(Math.min(dt, 0.05));
+  });
+
+  return <primitive object={rig.model} rotation={[0, Math.PI, 0]} />;
+}
+
+function Flashlight({ pose, shadowSize }: { pose: RefObject<Pose>; shadowSize: number }) {
+  const spot = useRef<THREE.SpotLight>(null!);
+  const beam = useRef<THREE.Group>(null!);
+  const target = useMemo(() => {
+    const o = new THREE.Object3D();
+    o.position.set(0.08, 0.7, 5);
+    return o;
+  }, []);
+  useFrame(({ clock }) => {
+    const { phase: p, amount: a } = pose.current;
+    const t = clock.elapsedTime;
+    spot.current.intensity = 42 + Math.sin(t * 31) * 0.4;
+    // the beam sways with the body: a hand-held light, not a camera
+    const sway = Math.sin(p) * 0.06 * a + Math.sin(t * 0.9) * 0.03;
+    const bob = Math.cos(p * 2) * 0.04 * a + Math.sin(t * 1.3) * 0.015;
+    target.position.x = 0.08 + sway * 5;
+    target.position.y = 0.6 + bob * 5;
+    beam.current.rotation.set(-bob, sway, 0);
+  });
+  return (
+    <group position={[0.14, 1.36, 0.22]}>
+      <mesh rotation={[Math.PI / 2, 0, 0]} material={steel}>
+        <cylinderGeometry args={[0.025, 0.02, 0.12, 10]} />
+      </mesh>
+      <mesh position={[0, 0, 0.061]} rotation={[Math.PI / 2, 0, 0]} material={lens}>
+        <circleGeometry args={[0.022, 12]} />
+      </mesh>
+      <spotLight
+        ref={spot}
+        position={[0, 0, 0.07]}
+        target={target}
+        angle={0.48}
+        penumbra={0.6}
+        distance={26}
+        decay={1.45}
+        intensity={42}
+        color="#fff3da"
+        castShadow
+        shadow-mapSize-width={shadowSize}
+        shadow-mapSize-height={shadowSize}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.02}
+        shadow-camera-near={0.1}
+        shadow-camera-far={26}
+      />
+      <primitive object={target} />
+      <group ref={beam}>
+        <mesh position={[0, 0.24, 2.99]} rotation={[-Math.PI / 2 - 0.08, 0, 0]} material={beamMaterial}>
+          <coneGeometry args={[1.55, 6, 24, 1, true]} />
+        </mesh>
       </group>
     </group>
   );

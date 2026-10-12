@@ -3,7 +3,7 @@
 import { use, useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { loadGLTF } from "../assets";
-import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
+import { clone, retargetClip } from "three/examples/jsm/utils/SkeletonUtils.js";
 
 // A faceless, armless figure built on a rigged human body (Mixamo skeleton).
 // The arms are collapsed into the shoulders so the skin reads as one wrapped
@@ -193,4 +193,83 @@ export function useStalker(skin: THREE.Material) {
   };
 
   return { model: rig.model, update };
+}
+
+// ------------------------------------------------------------------ Elena
+
+export const ELENA_URL = "models/elena.glb";
+
+/** Elena: a rigged woman, driven by the creature file's motion (same Mixamo
+ *  skeleton; rotations only, so proportions stay hers). Materials are cloned
+ *  and transparent so she can fade. */
+export function useElena(clips: string[] = ["idle"]) {
+  const body = use(loadGLTF(ELENA_URL));
+  const moves = use(loadGLTF(CREATURE_URL));
+  const rig = useMemo(() => {
+    const model = clone(body.scene);
+    const mats: THREE.MeshStandardMaterial[] = [];
+    model.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh) {
+        const mat = (m.material as THREE.MeshStandardMaterial).clone();
+        mat.transparent = true;
+        mat.roughness = 0.85;
+        // drained of colour: a photograph left in the sun
+        mat.onBeforeCompile = (sh) => {
+          sh.fragmentShader = sh.fragmentShader.replace(
+            "#include <map_fragment>",
+            "#include <map_fragment>\n  float g = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11));\n  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(g) * vec3(0.86, 0.92, 0.9), 0.85);",
+          );
+        };
+        m.material = mat;
+        mats.push(mat);
+        m.castShadow = true;
+        m.frustumCulled = false;
+      }
+    });
+    const bones: Record<string, THREE.Bone> = {};
+    model.traverse((o) => {
+      if ((o as THREE.Bone).isBone) bones[o.name] = o as THREE.Bone;
+    });
+    // Pose her from the bind (T) pose by aiming limbs in model space: arms
+    // hanging, elbows soft, head bowed. Breathing is added per frame.
+    model.updateMatrixWorld(true);
+    const aim = (bone?: THREE.Bone, child?: THREE.Object3D, dir?: THREE.Vector3) => {
+      if (!bone || !child || !dir) return;
+      const a = new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld);
+      const b = new THREE.Vector3().setFromMatrixPosition(child.matrixWorld);
+      const cur = b.sub(a).normalize();
+      const delta = new THREE.Quaternion().setFromUnitVectors(cur, dir.clone().normalize());
+      const world = bone.getWorldQuaternion(new THREE.Quaternion());
+      const parent = bone.parent!.getWorldQuaternion(new THREE.Quaternion());
+      bone.quaternion.copy(parent.invert().multiply(delta.multiply(world)));
+      bone.updateMatrixWorld(true);
+    };
+    const B = bones;
+    aim(B.mixamorigLeftArm, B.mixamorigLeftForeArm, new THREE.Vector3(0.16, -1, 0.06));
+    aim(B.mixamorigRightArm, B.mixamorigRightForeArm, new THREE.Vector3(-0.16, -1, 0.06));
+    aim(B.mixamorigLeftForeArm, B.mixamorigLeftHand, new THREE.Vector3(0.08, -1, 0.22));
+    aim(B.mixamorigRightForeArm, B.mixamorigRightHand, new THREE.Vector3(-0.08, -1, 0.22));
+    aim(B.mixamorigHead, B.mixamorigHeadTop_End, new THREE.Vector3(0, 0.82, 0.55));
+    const rest: Record<string, THREE.Quaternion> = {};
+    for (const [n, b] of Object.entries(B)) rest[n] = b.quaternion.clone();
+    const mixer = new THREE.AnimationMixer(model);
+    void clips;
+    return { model, mixer, mats, bones, rest };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [body, moves]);
+  useEffect(() => () => void rig.mixer.stopAllAction(), [rig]);
+  /** Reset to her pose; callers then add their own small motions. */
+  const breathe = (t: number) => {
+    for (const [n, q] of Object.entries(rig.rest)) rig.bones[n].quaternion.copy(q);
+    const s = Math.sin(t * 1.6);
+    rig.bones.mixamorigSpine1?.rotateX(s * 0.015);
+    rig.bones.mixamorigLeftShoulder?.rotateZ(s * 0.01);
+    rig.bones.mixamorigRightShoulder?.rotateZ(-s * 0.01);
+  };
+  const setOpacity = (v: number) => {
+    for (const m of rig.mats) m.opacity = v;
+    rig.model.visible = v > 0.02;
+  };
+  return { ...rig, setOpacity, breathe };
 }

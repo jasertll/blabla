@@ -108,7 +108,7 @@ export function Player() {
     // gait + footsteps
     runtime.walkPhase += dt * speed * (speed > 3 ? 2.5 : 3.1);
     pose.current.phase = runtime.walkPhase;
-    pose.current.amount = Math.min(speed / WALK, 1.7);
+    pose.current.amount = Math.min(speed / WALK, 2.3);
     const stepIdx = Math.floor(runtime.walkPhase / Math.PI);
     if (stepIdx !== lastStep.current && speed > 0.4) {
       lastStep.current = stepIdx;
