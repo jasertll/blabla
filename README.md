@@ -12,6 +12,39 @@ npm run build && npm start
 
 Best on a desktop browser with a real GPU and headphones.
 
+## Deploy (needed for the online tools)
+
+Half of the instruments look things up on the internet (IP, domain, username, certificates, satellites, gold,
+canary tokens, threat feeds). They call this app's own `/api/*` routes, so they only work where the app runs
+with its server: the static copy (the private artifact) has none.
+
+1. On [vercel.com](https://vercel.com) choose **Add New → Project** and import `jasertll/blabla`
+   (pick the branch `claude/game-style-website-design-ekvqeq`, or merge it first).
+2. Add the keys you use as **Environment Variables** (all optional; each enables one provider):
+   `NVD_API_KEY`, `HIBP_API_KEY`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (canary tokens),
+   `TWELVEDATA_API_KEY`, `FINNHUB_API_KEY`, `OANDA_API_TOKEN`, `OANDA_ENV`, `TINEYE_API_KEY`,
+   `WIGLE_API_NAME`, `WIGLE_API_TOKEN`, `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `X_BEARER_TOKEN`, `SITE_PASSWORD`.
+3. Deploy. The music (`public/audio/tapes/*.mp3`) and the storm video (`public/video/storm.*`) are private and not in
+   git: upload them to the project, or the game falls back to a generated tape and skips the video.
+
+The static copy can borrow that server: **⚙ Settings → Tools server** → paste the deployment URL.
+The `/api/*` routes send CORS headers for this.
+
+## The case
+
+Five pieces of evidence, each a real file built in the browser and read by a real instrument:
+
+| Evidence | Found | Instrument | What it shows |
+|---|---|---|---|
+| `letter_from_elena.eml` | in your pocket (1F) | Email Header Forensics (B1) | Received chain starts at 10.4.17.201, room 201; SPF fails; sent by your phone |
+| `room201_0417.png` | the diary (2F) | Steganography Scanner (B1) | LSB message: her phone is in the morgue |
+| `elena_phone.pcap` | autopsy report (B1) | PCAP Analyzer (B1) | cleartext login `e.voss / candle`, DNS tunnel leaking the visitor log |
+| `lantern_implant.bin` + rule | reel case, keypad `CANDLE` (B2) | YARA Rule Tester / File Inspector (B1) | `operator=DIRECTOR_KESSLER`, the task that wrote the letter |
+| `lantern_minutes.pdf` | Director's desk (4F) | PDF Toolkit → forensics (B2) | metadata author: D. MORROW, the man who reported her |
+
+Answering each question adds the people, addresses and files to the Intelligence Graph (4F). When all five are
+answered, the note on the roof can be read. `C` opens the case file.
+
 ## Controls
 
 | Key | Action |

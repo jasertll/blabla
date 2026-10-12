@@ -120,6 +120,13 @@ export function CameraRig() {
     camera.lookAt(look.current);
     camera.getWorldDirection(dir);
     runtime.viewYaw = Math.atan2(dir.x, dir.z);
+    // a hand-held operator: slow breathing drift, and a sway in step with the walk
+    const t = performance.now() / 1000;
+    const walk = Math.min(runtime.speed / 2, 1.6);
+    const still = runtime.focus ? 0.35 : 1;
+    camera.rotateZ((Math.sin(t * 0.63) * 0.006 + Math.sin(t * 1.71) * 0.002 + Math.sin(runtime.walkPhase) * 0.005 * walk) * still);
+    camera.rotateY((Math.sin(t * 0.41) * 0.004 + Math.sin(t * 1.13) * 0.0015) * still);
+    camera.rotateX((Math.sin(t * 0.53) * 0.003 + Math.abs(Math.cos(runtime.walkPhase)) * 0.006 * walk) * still);
 
     fill.current.position.copy(camera.position);
   });

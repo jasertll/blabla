@@ -24,13 +24,37 @@ interface Entry {
 const registry = new Set<Entry>();
 let otherworld = false;
 
+// Photographed textures (CC0, from the three.js examples). Loaded once and
+// cloned per surface so each can carry its own repeat.
+const photoCache = new Map<string, THREE.Texture>();
+function photo(url: string, rx: number, ry: number, srgb: boolean) {
+  let base = photoCache.get(url);
+  if (!base) {
+    base = new THREE.TextureLoader().load(url, () => {
+      // clones made before the image arrived need re-uploading
+      for (const e of registry) {
+        const m = e.mat;
+        if (m.map?.source === base!.source) m.map.needsUpdate = true;
+        if (m.normalMap?.source === base!.source) m.normalMap.needsUpdate = true;
+      }
+    });
+    base.wrapS = base.wrapT = THREE.RepeatWrapping;
+    base.anisotropy = 8;
+    if (srgb) base.colorSpace = THREE.SRGBColorSpace;
+    photoCache.set(url, base);
+  }
+  const t = base.clone();
+  t.repeat.set(rx, ry);
+  return t;
+}
+
 const looks: Record<SurfaceKind, (rx: number, ry: number) => [Look, Look]> = {
   wall: (rx, ry) => [
     { map: tex("wall", rx, ry), normal: normalTex("wall", rx, ry, 3), color: new THREE.Color(1, 1, 1), roughness: 0.78, metalness: 0, bump: 0.55 },
     { map: tex("rust", rx, ry), normal: normalTex("rust", rx, ry, 8), color: new THREE.Color(0.85, 0.75, 0.72), roughness: 0.62, metalness: 0.35, bump: 1.4 },
   ],
   floor: (rx, ry) => [
-    { map: tex("tiles", rx, ry), normal: normalTex("tiles", rx, ry, 4), color: new THREE.Color(1, 1, 1), roughness: 0.42, metalness: 0, bump: 0.7 },
+    { map: photo("textures/floor_diffuse.jpg", rx * 1.35, ry * 1.35, true), normal: photo("textures/floor_normal.jpg", rx * 1.35, ry * 1.35, false), color: new THREE.Color(0.72, 0.74, 0.7), roughness: 0.38, metalness: 0, bump: 0.9 },
     { map: tex("grate", rx * 2, ry * 2), normal: normalTex("grate", rx * 2, ry * 2, 10), color: new THREE.Color(1, 0.9, 0.85), roughness: 0.5, metalness: 0.55, bump: 1.5 },
   ],
   ceiling: (rx, ry) => [

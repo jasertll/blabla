@@ -284,7 +284,7 @@ function HeroBody({ pose }: { pose: RefObject<Pose> }) {
         mat.roughness = Math.max(mat.roughness ?? 0.8, 0.7);
         mat.metalness = Math.min(mat.metalness ?? 0, 0.15);
         // the parade-ground tan becomes worn olive field gear
-        mat.color.set("#7c8a5e");
+        mat.color.set("#5d6646");
         if (/visor/i.test(m.name)) m.visible = false;
       }
     });

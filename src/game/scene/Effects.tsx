@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { Bloom, ChromaticAberration, EffectComposer, N8AO, Noise, Vignette } from "@react-three/postprocessing";
+import { Bloom, BrightnessContrast, ChromaticAberration, EffectComposer, HueSaturation, N8AO, Noise, Vignette } from "@react-three/postprocessing";
 import { BlendFunction, type ChromaticAberrationEffect, type NoiseEffect, type VignetteEffect } from "postprocessing";
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
@@ -29,6 +29,7 @@ export function Effects() {
   if (quality === "low")
     return (
       <EffectComposer multisampling={0}>
+        <HueSaturation hue={0.04} saturation={-0.3} />
         <Noise ref={noise} premultiply blendFunction={BlendFunction.SCREEN} />
         <Vignette ref={vignette} eskil={false} offset={0.22} darkness={0.75} />
       </EffectComposer>
@@ -38,6 +39,9 @@ export function Effects() {
     <EffectComposer multisampling={quality === "high" ? 4 : 0}>
       <N8AO aoRadius={0.9} distanceFalloff={0.6} intensity={2.6} quality={quality === "high" ? "high" : "medium"} halfRes={quality !== "high"} />
       <Bloom intensity={0.55} luminanceThreshold={0.62} luminanceSmoothing={0.3} mipmapBlur />
+      {/* the look: colour drained toward grey-green, blacks crushed a little */}
+      <HueSaturation hue={0.04} saturation={-0.3} />
+      <BrightnessContrast brightness={-0.015} contrast={0.12} />
       <ChromaticAberration ref={ca} offset={offset} radialModulation modulationOffset={0.25} />
       <Noise ref={noise} premultiply blendFunction={BlendFunction.SCREEN} />
       <Vignette ref={vignette} eskil={false} offset={0.22} darkness={0.75} />
