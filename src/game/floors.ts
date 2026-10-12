@@ -76,6 +76,55 @@ export function roomGeometry(spec: WardSpec): { rooms: RoomGeom[]; zEnd: number 
   return { rooms, zEnd: deepest - spec.tail };
 }
 
+/** Small things left behind, one per room: each is a story in a sentence. */
+export const ROOM_STORIES: Record<string, { label: string; text: string }> = {
+  "301": { label: "Look at the drawing", text: "A child's drawing taped to a cabinet: a man holding a glowing phone. Every Thursday on the calendar beside it is circled in red." },
+  "302": { label: "Read the sticky note", text: "\"Visitor badge #0417 — never signs out. Ask security.\" Someone has written underneath: \"Security IS the network.\"" },
+  "303": { label: "Check the wristband", text: "A hospital wristband, cut off with scissors. VOSS, E. — Room 201. The plastic is still warm." },
+  "401": { label: "Look at the photograph", text: "A staff photo. Elena is in the second row. The man beside her has been scratched out, but his coat hasn't." },
+  "402": { label: "Read the ticker strip", text: "The tape repeats one line between the prices: SUBJECT 0417 ONLINE. SUBJECT 0417 ONLINE." },
+  "403": { label: "Read the chart margin", text: "In the margin, in pencil: \"Initial access: a visitor's phone on the guest Wi-Fi. Persistence: grief.\"" },
+  DIR: { label: "Open the drawer", text: "A drawer full of confiscated phones, each tagged with a name and a date. One tag is blank. It's waiting for yours." },
+  B101: { label: "Read the toe tag", text: "CASE 0201. Personal effects: one phone (not hers), one hospital bracelet, one sheet of paper folded into a small boat." },
+  B102: { label: "Read the jar label", text: "SPECIMEN: \"Trust\". The jar is empty. The label is in Elena's handwriting." },
+  B103: { label: "Look at the drying prints", text: "Every print is the same photograph of room 201. In each one the visitor's chair is a little closer to the bed." },
+  B104: { label: "Read the clipboard", text: "\"Chain of custody broken at 04:17. Evidence altered by: [blank]. Witness: LANTERN.\"" },
+  B105: { label: "Listen to the monitor", text: "The heart monitor still beeps. There is no one attached to it. The rhythm matches your own." },
+  B106: { label: "Look at the slide", text: "Under the microscope, a slide labelled \"SAMPLE: the letter\". Magnified, the ink is made of tiny words: from your phone, from your phone." },
+  ARC: { label: "Read the spine", text: "A binder spine: \"VISITOR LOGS 2021 — DO NOT DELETE (H.K.)\". Every page inside has been torn out except Thursdays." },
+  B201: { label: "Look at the birdcage", text: "A dead canary and a note: \"When it stops singing, someone has opened the file.\" It stopped singing." },
+  B202: { label: "Read the proof sheet", text: "Printing plates for a letter. \"I know you stopped waiting for me.\" Dozens of copies. All signed — E." },
+  B203: { label: "Check the stamp", text: "The notary stamp reads AUTHENTIC. It has been pressed onto a blank page a hundred times." },
+  B204: { label: "Look at the enlargement", text: "An enlargement of a reflection in a window: a man in a coat, holding a phone up, filming room 201." },
+};
+
+export type ClutterKind = "gurney" | "wheelchair" | "iv" | "cart" | "chairs" | "papers" | "bench";
+export interface Clutter {
+  kind: ClutterKind;
+  at: V2;
+  rotY: number;
+}
+
+/** Things abandoned along a corridor, kept clear of doors and the walking line. */
+export function corridorClutter(spec: WardSpec): Clutter[] {
+  const { rooms, zEnd } = roomGeometry(spec);
+  const doors = rooms.map((r) => ({ side: r.spec.side, z: r.zDoor }));
+  const kinds: ClutterKind[] = ["gurney", "wheelchair", "iv", "cart", "papers", "chairs", "bench", "papers"];
+  let seed = spec.id.charCodeAt(0) * 31 + spec.id.charCodeAt(1);
+  const rnd = () => ((seed = (seed * 9301 + 49297) % 233280) / 233280);
+  const out: Clutter[] = [];
+  let k = 0;
+  for (let z = -2.5; z > zEnd + 2.5; z -= 3.2 + rnd() * 1.6) {
+    const side = (k % 2 ? 1 : -1) as 1 | -1;
+    k++;
+    if (doors.some((d) => d.side === side && Math.abs(d.z - z) < 1.4)) continue;
+    if (spec.endZ !== undefined && z < spec.endZ + 1) continue;
+    const kind = kinds[Math.floor(rnd() * kinds.length)];
+    out.push({ kind, at: [side * (kind === "papers" ? 0.6 : 1.25), z], rotY: kind === "gurney" || kind === "bench" ? Math.PI / 2 : rnd() * 6 });
+  }
+  return out;
+}
+
 export function buildWard(spec: WardSpec): FloorLayout {
   const { rooms, zEnd } = roomGeometry(spec);
   const walls: Wall[] = [
@@ -97,6 +146,11 @@ export function buildWard(spec: WardSpec): FloorLayout {
   }
   const rects: Box[] = [{ min: [-HALF, zEnd], max: [HALF, 4] }];
   const colliders: Box[] = [...(spec.extras?.colliders ?? [])];
+  for (const c of corridorClutter(spec)) {
+    if (c.kind === "papers") continue;
+    const half = c.kind === "gurney" || c.kind === "bench" ? [0.4, 1.0] : [0.35, 0.35];
+    colliders.push({ min: [c.at[0] - half[0], c.at[1] - half[1]], max: [c.at[0] + half[0], c.at[1] + half[1]] });
+  }
   const interactables: Interactable[] = [
     { id: `elevator-${spec.id}`, kind: "elevator", at: [0, 3.2], radius: 1.4, label: "Call the elevator", node: "elevator" },
     ...(spec.extras?.interactables ?? []),
@@ -153,6 +207,17 @@ export function buildWard(spec: WardSpec): FloorLayout {
         at: [s * (HALF + 2.2), r.zDoor - 2.0],
         radius: 1.0,
         label: r.spec.memo.label,
+      });
+    const story = ROOM_STORIES[id];
+    if (story)
+      interactables.push({
+        id: `story-${id}`,
+        kind: "message",
+        node: `r${id}`,
+        at: [s * (HALF + 3.4), r.zTop - 1.0],
+        radius: 0.9,
+        label: story.label,
+        text: story.text,
       });
     camZones.push({ min: [xMin, r.zBot], max: [xMax, r.zTop], cam: [s * (HALF + 0.55), spec.height - 0.35, r.zTop - 0.45] });
     layoutRooms.push({ id, label: id, min: [xMin, r.zBot], max: [xMax, r.zTop], node: `t${id}` });

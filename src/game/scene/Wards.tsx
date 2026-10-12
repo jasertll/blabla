@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { loadGLTF } from "../assets";
 import { cellEmptied, phone } from "../events";
-import { B1_BARS_Z, DEPTH, HALF, roomGeometry, type WardSpec } from "../floors";
+import { B1_BARS_Z, corridorClutter, DEPTH, HALF, ROOM_STORIES, roomGeometry, type Clutter, type WardSpec } from "../floors";
 import type { V3 } from "../level";
 import { M } from "../materials";
 import { runtime, useGame } from "../store";
@@ -70,6 +70,12 @@ export function GenericWard({ spec }: { spec: WardSpec }) {
           </group>
         );
       })}
+      {corridorClutter(spec).map((c, i) => (
+        <ClutterProp key={i} c={c} />
+      ))}
+      {rooms.map((r) =>
+        ROOM_STORIES[r.spec.room] ? <Glint key={`g${r.spec.room}`} at={[r.spec.side * (HALF + 3.4), r.zTop - 1.0]} flag={`seen:story-${r.spec.room}`} /> : null,
+      )}
       {/* dead end */}
       {spec.id !== "B1" && <Door position={[0, 0, zEnd + 0.11]} label="STAIRS" />}
       <FloorDetails spec={spec} zEnd={zEnd} />
@@ -427,3 +433,72 @@ function TownBelow() {
   );
 }
 
+
+// ------------------------------------------------------------------ clutter & glints
+
+function ClutterProp({ c }: { c: Clutter }) {
+  const pos: V3 = [c.at[0], 0, c.at[1]];
+  switch (c.kind) {
+    case "gurney":
+      return <Gurney position={pos} rotY={c.rotY} />;
+    case "wheelchair":
+      return <Wheelchair position={pos} rotY={c.rotY} />;
+    case "iv":
+      return <IVStand position={pos} tilt={0.15} />;
+    case "cart":
+      return <LinenCart position={pos} rotY={c.rotY} />;
+    case "bench":
+      return (
+        <group position={pos} rotation={[0, c.rotY, 0]}>
+          <mesh position={[0, 0.45, 0]} material={M.darkWood} castShadow receiveShadow>
+            <boxGeometry args={[1.8, 0.06, 0.45]} />
+          </mesh>
+          {[-0.8, 0.8].map((x) => (
+            <mesh key={x} position={[x, 0.22, 0]} material={M.darkMetal}>
+              <boxGeometry args={[0.05, 0.44, 0.4]} />
+            </mesh>
+          ))}
+        </group>
+      );
+    case "chairs":
+      return (
+        <group position={pos} rotation={[0, c.rotY, 0]}>
+          <mesh position={[0, 0.25, 0]} rotation={[0, 0, Math.PI / 2.2]} material={M.darkMetal} castShadow>
+            <boxGeometry args={[0.45, 0.05, 0.45]} />
+          </mesh>
+          <mesh position={[0.25, 0.45, 0]} rotation={[0, 0, 0.3]} material={M.darkMetal} castShadow>
+            <boxGeometry args={[0.05, 0.5, 0.45]} />
+          </mesh>
+        </group>
+      );
+    default:
+      return (
+        <group position={pos}>
+          {[0, 1, 2, 3].map((k) => (
+            <Sheet key={k} position={[Math.sin(k * 2.1) * 0.35, 0.012 + k * 0.001, Math.cos(k * 1.3) * 0.4]} rotation={[-Math.PI / 2, 0, k * 1.2]} seed={k + Math.round(c.at[1])} />
+          ))}
+        </group>
+      );
+  }
+}
+
+/** The faint glint of something worth examining, until you have looked at it. */
+function Glint({ at, flag }: { at: [number, number]; flag: string }) {
+  const seen = useGame((s) => s.flags.includes(flag));
+  const ref = useRef<THREE.Mesh>(null!);
+  useFrame(({ clock }) => {
+    const k = 0.5 + Math.sin(clock.elapsedTime * 3 + at[0]) * 0.5;
+    ref.current.scale.setScalar(0.6 + k * 0.6);
+    (ref.current.material as THREE.MeshBasicMaterial).opacity = 0.25 + k * 0.6;
+  });
+  if (seen) return null;
+  return (
+    <group position={[at[0], 0, at[1]]}>
+      <Sheet position={[0, 0.012, 0]} rotation={[-Math.PI / 2, 0, 0.7]} size={[0.15, 0.2]} kind="photo" seed={Math.round(at[1] * 7)} />
+      <mesh ref={ref} position={[0, 0.12, 0]}>
+        <sphereGeometry args={[0.035, 8, 8]} />
+        <meshBasicMaterial color="#fff6dc" transparent toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}

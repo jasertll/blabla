@@ -111,6 +111,7 @@ export function interact(i: Interactable) {
       g.say("Your progress has been saved.");
       break;
     case "message":
+      g.flag(`seen:${i.id}`);
       if (i.id === "mirror-201" && g.flags.includes("read:diary-201")) mirrorChange();
       else if (i.id === "cell-b1") g.say(cellText());
       else if (i.text) g.say(i.text);
