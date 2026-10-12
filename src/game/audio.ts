@@ -514,6 +514,45 @@ class AudioEngine {
     n.stop(t + 0.15);
   }
 
+  /** A heavy pipe cutting the air. */
+  whoosh() {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const n = this.noise(false);
+    const f = ctx.createBiquadFilter();
+    f.type = "bandpass";
+    f.Q.value = 1.2;
+    f.frequency.setValueAtTime(300, t);
+    f.frequency.exponentialRampToValueAtTime(1800, t + 0.18);
+    f.frequency.exponentialRampToValueAtTime(400, t + 0.32);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.5, t + 0.12);
+    g.gain.linearRampToValueAtTime(0, t + 0.34);
+    n.connect(f).connect(g).connect(this.sfx);
+    n.start(t, Math.random());
+    n.stop(t + 0.36);
+  }
+
+  /** Metal on flesh, or flesh on you. */
+  impact() {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    this.thump(t, 1.2);
+    const n = this.noise(false);
+    const f = ctx.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.value = 900;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.7, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    n.connect(f).connect(g).connect(this.sfx);
+    n.start(t, Math.random());
+    n.stop(t + 0.25);
+  }
+
   blip() {
     if (!this.ctx) return;
     const ctx = this.ctx;

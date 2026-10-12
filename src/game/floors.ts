@@ -104,6 +104,11 @@ export function buildWard(spec: WardSpec): FloorLayout {
   const camZones: CamZone[] = [];
   const nodes: Record<string, V2> = { elevator: [0, 2.6] };
   const edges: [string, string][] = [];
+  // a health drink left on the floor near the elevator, and one at the dead end
+  interactables.push(
+    { id: `drink-${spec.id}-a`, kind: "item", at: [-1.1, -0.2], radius: 0.9, label: "Take the health drink" },
+    { id: `drink-${spec.id}-b`, kind: "item", at: [1.1, (spec.endZ ?? zEnd + 1.2) + 0.3], radius: 0.9, label: "Take the health drink" },
+  );
   const layoutRooms: FloorLayout["rooms"] = [{ id: `${spec.id}-corridor`, label: "Corridor", min: [-HALF, zEnd], max: [HALF, 4], node: "elevator" }];
 
   const seenTop = new Set<string>();

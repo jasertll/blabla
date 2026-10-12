@@ -166,7 +166,7 @@ export function Player() {
     >
       <group position={[0, -FEET, 0]}>
         {/* a soft key light on the hero, as games do, so he never becomes a pure silhouette */}
-        <pointLight position={[0.6, 2.3, 1.4]} intensity={1.1} distance={3.2} decay={2} color="#c9d0cc" />
+        <pointLight position={[0.6, 2.3, 1.4]} intensity={2.2} distance={3.4} decay={2} color="#c9d0cc" />
         <Character pose={pose} shadowSize={quality === "high" ? 2048 : quality === "medium" ? 1024 : 512} />
       </group>
     </Ecctrl>

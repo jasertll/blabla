@@ -114,6 +114,13 @@ export function interact(i: Interactable) {
       else if (i.id === "cell-b1") g.say(cellText());
       else if (i.text) g.say(i.text);
       break;
+    case "item":
+      if (g.flags.includes(`took:${i.id}`)) break;
+      g.flag(`took:${i.id}`);
+      g.heal(45);
+      audio.blip();
+      g.say(g.health >= 100 ? "A health drink. Bitter, like old pennies. I feel steadier." : "A health drink. The shaking in my hands eases a little.");
+      break;
     case "phone":
       answerPhone();
       break;

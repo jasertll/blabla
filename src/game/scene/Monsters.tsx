@@ -9,6 +9,8 @@ import { runtime, useGame, type PlayFloor } from "../store";
 import { baseTexture } from "../textures";
 import { stalkerSkin, useCreature, useStalker } from "./Creature";
 import { collide } from "./Player";
+import { foes, hurtPlayer } from "../combat";
+import { audio } from "../audio";
 
 /** Distance from the player to every visible creature; the radio listens to it. */
 export const threatDistances = new Map<string, number>();
@@ -34,6 +36,131 @@ function randomIn(area: { min: V2; max: V2 }) {
   );
 }
 
+// ------------------------------------------------------------------ the hunt
+
+type Mode = "wander" | "chase" | "windup" | "recover" | "stagger" | "dead";
+
+interface Hunter {
+  pos: THREE.Vector3;
+  heading: number;
+  speed: number;
+  mode: Mode;
+  timer: number;
+  hp: number;
+  target: THREE.Vector3;
+  fall: number;
+}
+
+const newHunter = (start: V2, area: { min: V2; max: V2 }, hp: number): Hunter => ({
+  pos: new THREE.Vector3(start[0], 0, start[1]),
+  heading: Math.PI,
+  speed: 0,
+  mode: "wander",
+  timer: 0,
+  hp,
+  target: randomIn(area),
+  fall: 0,
+});
+
+/** Shared behaviour: wander until it senses you, close in, wind up, strike.
+ *  The flashlight slows it; the pipe staggers and eventually kills it. */
+function stepHunter(
+  h: Hunter,
+  dt: number,
+  area: { min: V2; max: V2 },
+  boxes: Box[],
+  o: { sense: number; chase: number; wander: number; damage: number; windup: number },
+) {
+  const vx = runtime.pos.x - h.pos.x;
+  const vz = runtime.pos.z - h.pos.z;
+  const d = Math.hypot(vx, vz);
+  const lit = isLit(h.pos.x, h.pos.z, 12, 0.42);
+  const g = useGame.getState();
+  const busy = !!g.activeTool || !!g.overlay || g.dead;
+  let speed = 0;
+  let dir = h.heading;
+  h.timer -= dt;
+  switch (h.mode) {
+    case "wander": {
+      const dx = h.target.x - h.pos.x;
+      const dz = h.target.z - h.pos.z;
+      if (Math.hypot(dx, dz) < 0.4) h.target = randomIn(area);
+      dir = Math.atan2(dx, dz);
+      speed = o.wander;
+      if (!busy && d < o.sense * (runtime.dread > 0.5 ? 1.5 : 1)) h.mode = "chase";
+      break;
+    }
+    case "chase":
+      dir = Math.atan2(vx, vz);
+      speed = o.chase * (lit ? 0.45 : 1);
+      if (busy || d > o.sense * 1.8) h.mode = "wander";
+      else if (d < 1.25) {
+        h.mode = "windup";
+        h.timer = o.windup;
+      }
+      break;
+    case "windup":
+      dir = Math.atan2(vx, vz);
+      if (h.timer <= 0) {
+        if (d < 1.7 && !busy) hurtPlayer(o.damage);
+        h.mode = "recover";
+        h.timer = 0.9;
+      }
+      break;
+    case "recover":
+    case "stagger":
+      if (h.timer <= 0) h.mode = "chase";
+      break;
+    case "dead":
+      h.fall = Math.min(1, h.fall + dt * 1.8);
+      break;
+  }
+  if (speed > 0) {
+    const turn = Math.atan2(Math.sin(dir - h.heading), Math.cos(dir - h.heading));
+    h.heading += turn * (1 - Math.exp(-dt * 5));
+    h.pos.x += Math.sin(h.heading) * speed * dt;
+    h.pos.z += Math.cos(h.heading) * speed * dt;
+    collide(h.pos, boxes, 0.32);
+    h.pos.x = THREE.MathUtils.clamp(h.pos.x, area.min[0], area.max[0]);
+    h.pos.z = THREE.MathUtils.clamp(h.pos.z, area.min[1], area.max[1]);
+  } else if (h.mode === "windup") {
+    const turn = Math.atan2(Math.sin(dir - h.heading), Math.cos(dir - h.heading));
+    h.heading += turn * (1 - Math.exp(-dt * 8));
+  }
+  h.speed += (speed - h.speed) * (1 - Math.exp(-dt * 5));
+  return { d, lit };
+}
+
+/** Register a hunter so the pipe can find it. */
+function useFoe(id: string, h: Hunter, maxHp: number, onDeath?: () => void) {
+  useEffect(() => {
+    const knock = new THREE.Vector3();
+    foes.set(id, {
+      pos: h.pos,
+      get alive() {
+        return h.mode !== "dead";
+      },
+      hit: (dmg, from) => {
+        if (h.mode === "dead") return;
+        h.hp -= dmg;
+        knock.set(h.pos.x - from.x, 0, h.pos.z - from.z).normalize().multiplyScalar(0.55);
+        h.pos.add(knock);
+        if (h.hp <= 0) {
+          h.mode = "dead";
+          audio.creak();
+          onDeath?.();
+        } else {
+          h.mode = "stagger";
+          h.timer = 0.6;
+        }
+      },
+    });
+    return () => void foes.delete(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+  void maxHp;
+}
+
 // ------------------------------------------------------------------ lying figure
 
 /** Faceless figure bound in its own skin. Wanders, writhes, and shrinks from light. */
@@ -41,102 +168,24 @@ function LyingFigure({ id, area, boxes, start }: { id: string; area: { min: V2; 
   const root = useRef<THREE.Group>(null!);
   const mat = useMemo(flesh, []);
   const creature = useCreature(mat);
-
-  const s = useRef({
-    pos: new THREE.Vector3(start[0], 0, start[1]),
-    target: randomIn(area),
-    mode: "wander" as "wander" | "approach" | "flee" | "hidden",
-    timer: 0,
-    opacity: 1,
-    heading: 0,
-    twitch: 0,
-    speed: 0,
-  });
+  const h = useRef(newHunter(start, area, 100)).current;
+  const twitch = useRef(0);
+  useFoe(id, h, 100);
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
-    const st = s.current;
     const t = clock.elapsedTime;
-    const nightmare = useGame.getState().nightmare || runtime.dread > 0.5;
-    const lit = st.mode !== "hidden" && isLit(st.pos.x, st.pos.z);
-    const toPlayer = tmp.set(runtime.pos.x - st.pos.x, 0, runtime.pos.z - st.pos.z);
-    const d = toPlayer.length();
-    let speed = 0;
-    let dir = 0;
-
-    if (lit && d < 8 && st.mode !== "flee") {
-      st.mode = "flee";
-      st.timer = 2.4;
-    }
-    switch (st.mode) {
-      case "wander": {
-        const dx = st.target.x - st.pos.x;
-        const dz = st.target.z - st.pos.z;
-        if (Math.hypot(dx, dz) < 0.4) st.target = randomIn(area);
-        dir = Math.atan2(dx, dz);
-        speed = 0.55;
-        if (nightmare && d < 14) st.mode = "approach";
-        break;
-      }
-      case "approach":
-        dir = Math.atan2(toPlayer.x, toPlayer.z);
-        speed = d > 2.4 ? 0.95 : 0;
-        if (!nightmare) st.mode = "wander";
-        break;
-      case "flee":
-        dir = Math.atan2(-toPlayer.x, -toPlayer.z);
-        speed = 2.1;
-        st.timer -= dt;
-        st.opacity = Math.max(0, st.timer / 2.4);
-        if (st.timer <= 0) {
-          st.mode = "hidden";
-          st.timer = 6 + Math.random() * 8;
-        }
-        break;
-      case "hidden":
-        st.timer -= dt;
-        if (st.timer <= 0) {
-          // reappear somewhere out of sight
-          for (let i = 0; i < 12; i++) {
-            const p = randomIn(area);
-            if (p.distanceTo(runtime.pos) > 9) {
-              st.pos.copy(p);
-              break;
-            }
-          }
-          st.mode = "wander";
-          st.target = randomIn(area);
-        }
-        break;
-    }
-    if (st.mode !== "flee") st.opacity = Math.min(1, st.opacity + dt * 0.5);
-    if (st.mode === "hidden") st.opacity = 0;
-
-    if (speed > 0) {
-      const turn = Math.atan2(Math.sin(dir - st.heading), Math.cos(dir - st.heading));
-      st.heading += turn * (1 - Math.exp(-dt * 4));
-      // shuffle: lurches forward in uneven pulses
-      const lurch = 0.5 + Math.max(0, Math.sin(t * 3.6 + st.pos.x)) * 0.9;
-      st.pos.x += Math.sin(st.heading) * speed * lurch * dt;
-      st.pos.z += Math.cos(st.heading) * speed * lurch * dt;
-      collide(st.pos, boxes, 0.3);
-      st.pos.x = THREE.MathUtils.clamp(st.pos.x, area.min[0], area.max[0]);
-      st.pos.z = THREE.MathUtils.clamp(st.pos.z, area.min[1], area.max[1]);
-    }
-    st.speed += (speed - st.speed) * (1 - Math.exp(-dt * 4));
-
-    // writhing: constant unease, violent spasms when lit
-    st.twitch = Math.max(0, st.twitch - dt);
-    if (Math.random() < (lit ? 0.25 : 0.015)) st.twitch = 0.12 + Math.random() * 0.25;
-    creature.update(dt, st.speed, st.twitch > 0, t);
-
-    root.current.position.copy(st.pos);
-    root.current.rotation.y = st.heading;
-    root.current.visible = st.opacity > 0.01;
-    mat.opacity = st.opacity;
-    mat.transparent = st.opacity < 0.99;
+    const { d, lit } = stepHunter(h, dt, area, boxes, { sense: 8, chase: 1.35, wander: 0.5, damage: 12, windup: 0.55 });
+    // writhing: constant unease, violent spasms when lit, hit or striking
+    twitch.current = Math.max(0, twitch.current - dt);
+    if (Math.random() < (lit || h.mode === "windup" || h.mode === "stagger" ? 0.3 : 0.015)) twitch.current = 0.12 + Math.random() * 0.25;
+    if (h.mode !== "dead") creature.update(dt, h.speed, twitch.current > 0, t);
+    root.current.position.set(h.pos.x, -h.fall * 0.15, h.pos.z);
+    root.current.rotation.set(-h.fall * 1.45, h.heading, 0);
+    mat.opacity = 1;
+    mat.transparent = false;
     mat.color.setRGB(0.05 + runtime.dread * 0.03, 0.018, 0.014);
-    threatDistances.set(id, root.current.visible ? d : 99);
+    threatDistances.set(id, h.mode === "dead" ? 99 : d);
   });
 
   return (
@@ -153,58 +202,18 @@ function Stalker({ id, area, boxes, start }: { id: string; area: { min: V2; max:
   const root = useRef<THREE.Group>(null!);
   const skin = useMemo(stalkerSkin, []);
   const body = useStalker(skin);
-  const st = useRef({ pos: new THREE.Vector3(start[0], 0, start[1]), heading: Math.PI, speed: 0, opacity: 0, lit: 0, gone: 0 });
+  const h = useRef(newHunter(start, area, 170)).current;
+  useFoe(id, h, 170);
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
-    const s = st.current;
     const t = clock.elapsedTime;
-    const vx = runtime.pos.x - s.pos.x;
-    const vz = runtime.pos.z - s.pos.z;
-    const d = Math.hypot(vx, vz);
-    const lit = isLit(s.pos.x, s.pos.z, 14, 0.4);
-    s.lit = lit ? s.lit + dt : 0;
-
-    let speed = 0;
-    if (s.gone > 0) {
-      s.gone -= dt;
-      s.opacity = Math.max(0, s.opacity - dt * 1.5);
-      if (s.gone <= 0) {
-        // come back from the far end of its area
-        for (let i = 0; i < 12; i++) {
-          const p = randomIn(area);
-          if (p.distanceTo(runtime.pos) > 10) {
-            s.pos.copy(p);
-            break;
-          }
-        }
-      }
-    } else {
-      s.opacity = Math.min(1, s.opacity + dt * 0.4);
-      if (!lit && d > 2.6) speed = d > 9 ? 0.75 : 0.5;
-      // stared at too long, or too close: it is simply not there any more
-      if (s.lit > 2.5 || d < 1.8) s.gone = 12 + Math.random() * 10;
-    }
-    if (speed > 0) {
-      const want = Math.atan2(vx, vz);
-      s.heading += Math.atan2(Math.sin(want - s.heading), Math.cos(want - s.heading)) * (1 - Math.exp(-dt * 3));
-      s.pos.x += Math.sin(s.heading) * speed * dt;
-      s.pos.z += Math.cos(s.heading) * speed * dt;
-      collide(s.pos, boxes, 0.32);
-      s.pos.x = THREE.MathUtils.clamp(s.pos.x, area.min[0], area.max[0]);
-      s.pos.z = THREE.MathUtils.clamp(s.pos.z, area.min[1], area.max[1]);
-    } else if (lit && s.gone <= 0) {
-      // caught in the light: it turns its face to you
-      const want = Math.atan2(vx, vz);
-      s.heading += Math.atan2(Math.sin(want - s.heading), Math.cos(want - s.heading)) * (1 - Math.exp(-dt * 6));
-    }
-    s.speed += (speed - s.speed) * (1 - Math.exp(-dt * 4));
-    body.update(dt, s.speed, lit, t);
-    root.current.position.copy(s.pos);
-    root.current.rotation.y = s.heading;
-    root.current.visible = s.opacity > 0.01;
-    skin.opacity = s.opacity;
-    threatDistances.set(id, root.current.visible ? d : 99);
+    const { d, lit } = stepHunter(h, dt, area, boxes, { sense: 11, chase: 1.75, wander: 0.4, damage: 20, windup: 0.7 });
+    if (h.mode !== "dead") body.update(dt, h.speed, lit || h.mode === "windup" || h.mode === "stagger", t);
+    root.current.position.set(h.pos.x, -h.fall * 0.2, h.pos.z);
+    root.current.rotation.set(-h.fall * 1.45, h.heading, 0);
+    skin.opacity = 1;
+    threatDistances.set(id, h.mode === "dead" ? 99 : d);
   });
 
   return (

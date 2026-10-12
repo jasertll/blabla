@@ -51,7 +51,7 @@ export function Hud() {
       <Radio />
       {hint && !busy && (
         <div className="absolute bottom-4 left-4 max-w-[90vw] font-mono text-[11px] leading-relaxed tracking-wider text-white/45">
-          MOUSE look · CLICK the floor to walk · WASD move · SHIFT run · E examine · C case file · M map · N nightmare · T next song · P pause music
+          MOUSE look · CLICK the floor to walk · WASD move · SHIFT run · E examine · F / right-click swing the pipe · C case file · M map · N nightmare · T next song · P pause music
         </div>
       )}
       <MiniPlayer />
@@ -693,6 +693,53 @@ export function Ending() {
         className="mt-10 border border-[#1b1a16]/50 px-6 py-2 font-display tracking-[0.35em] hover:bg-[#1b1a16] hover:text-[#e9e6dc]"
       >
         STAY A WHILE
+      </button>
+    </div>
+  );
+}
+
+/** Pain: a red flash on every hit, and the edges of the screen closing in as health drops. */
+export function HurtLayer() {
+  const hurtAt = useGame((s) => s.hurtAt);
+  const health = useGame((s) => s.health);
+  const low = 1 - health / 100;
+  return (
+    <>
+      <div
+        className="pointer-events-none absolute inset-0 z-30 transition-opacity duration-1000"
+        style={{
+          opacity: low * 0.95,
+          background: "radial-gradient(ellipse at center, transparent 45%, rgba(110,0,0,0.55) 80%, rgba(40,0,0,0.9) 100%)",
+          animation: health < 35 ? "pulse-red 0.9s ease-in-out infinite" : undefined,
+        }}
+      />
+      {hurtAt > 0 && <div key={hurtAt} className="hurt-flash pointer-events-none absolute inset-0 z-30" />}
+    </>
+  );
+}
+
+/** The fog takes you. Wake at the elevator of the floor you fell on. */
+export function DeathScreen() {
+  const dead = useGame((s) => s.dead);
+  if (!dead) return null;
+  const wake = () => {
+    const g = useGame.getState();
+    const layout = layoutFor(g.floor);
+    if (layout) {
+      runtime.pos.set(layout.elevatorSpawn.at[0], 0, layout.elevatorSpawn.at[1]);
+      runtime.yaw = layout.elevatorSpawn.yaw;
+      runtime.camYaw = layout.elevatorSpawn.yaw;
+    }
+    runtime.path = [];
+    g.revive();
+    g.say("I woke up by the elevator. Something had been standing over me.");
+  };
+  return (
+    <div className="ending pointer-events-auto absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 text-center">
+      <p className="font-display text-[clamp(2rem,6vw,4rem)] tracking-[0.3em] text-[#8e1a12]">THE FOG TAKES YOU</p>
+      <p className="mt-4 font-typewriter text-white/50">Your eyes close. The radio keeps hissing somewhere far away.</p>
+      <button onClick={wake} className="mt-10 border border-white/30 px-8 py-2 font-display tracking-[0.35em] text-white/80 hover:bg-white/10">
+        WAKE UP
       </button>
     </div>
   );

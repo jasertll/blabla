@@ -64,6 +64,15 @@ interface GameState {
   voice: { who: string; text: string; id: number } | null;
   speak: (who: string, text: string | null) => void;
   visited: string[];
+  /** 0..100. At 0 the fog takes you. */
+  health: number;
+  hurtAt: number;
+  dead: boolean;
+  swingAt: number;
+  hurt: (n: number) => void;
+  heal: (n: number) => void;
+  revive: () => void;
+  swing: () => void;
   /** Story beats that have happened (saved). */
   flags: string[];
   flag: (f: string) => void;
@@ -124,6 +133,22 @@ export const useGame = create<GameState>((set, get) => ({
   speak: (who, text) => set({ voice: text ? { who, text, id: Math.random() } : null }),
   visited: [],
   flags: [],
+  health: 100,
+  hurtAt: 0,
+  dead: false,
+  swingAt: 0,
+  hurt: (n) => {
+    const s = get();
+    if (s.dead || s.activeTool || s.overlay) return;
+    const health = Math.max(0, s.health - n);
+    set({ health, hurtAt: performance.now(), dead: health <= 0 });
+  },
+  heal: (n) => set((s) => ({ health: Math.min(100, s.health + n) })),
+  revive: () => set({ health: 100, dead: false }),
+  swing: () => {
+    const s = get();
+    if (performance.now() - s.swingAt > 650 && !s.dead) set({ swingAt: performance.now() });
+  },
   flag: (f) => {
     if (!get().flags.includes(f)) set((s) => ({ flags: [...s.flags, f] }));
   },
@@ -132,9 +157,9 @@ export const useGame = create<GameState>((set, get) => ({
   quality: "medium",
   retro: (() => {
     try {
-      return localStorage.getItem("brookhaven.retro") !== "0";
+      return localStorage.getItem("brookhaven.retro") === "1";
     } catch {
-      return true;
+      return false;
     }
   })(),
   setRetro: (retro) => {

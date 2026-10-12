@@ -17,7 +17,7 @@ export interface Box {
   max: V2;
 }
 
-export type InteractKind = "tool" | "elevator" | "locked" | "memo" | "save" | "cassette" | "message" | "phone";
+export type InteractKind = "tool" | "elevator" | "locked" | "memo" | "save" | "cassette" | "message" | "phone" | "item";
 
 export interface Interactable {
   id: string;
@@ -113,6 +113,7 @@ const LOBBY: FloorLayout = {
       focus: { cam: [-3.1, 1.75, -2.55], look: [-3.1, 1.12, -3.95] },
     },
     { id: "memo-lobby", kind: "memo", at: [-8.5, 1.5], radius: 1.2, label: "Read the letter again" },
+    { id: "drink-1f", kind: "item", at: [3.6, -3.0], radius: 0.9, label: "Take the health drink" },
     { id: "save-lobby", kind: "save", at: [-9, -5], radius: 1.3, label: "Touch the red square" },
     { id: "elevator-1f", kind: "elevator", at: [9.2, 0], radius: 1.4, label: "Call the elevator" },
     { id: "clock-1f", kind: "message", at: [5.2, -7.1], radius: 1.1, label: "Look at the clock", text: "It stopped at 4:17. The letter was postmarked 4:17 too." },
@@ -203,6 +204,7 @@ const WARD: FloorLayout = {
     { id: "notice-2f", kind: "message", at: [-1.0, -8], radius: 0.9, label: "Read the notice board", text: "PATIENT 201: NO NETWORK ACCESS UNDER ANY CIRCUMSTANCES. Underlined three times." },
     { id: "mirror-201", kind: "message", at: [-7.6, 0.15], radius: 0.9, label: "Look in the mirror", text: "That's me. I'm almost sure that's me." },
     { id: "bed-201", kind: "message", at: [-4.6, -7.4], radius: 0.9, label: "Examine the bed", text: "The mattress is soaked through. The stain has the shape of someone lying down." },
+    { id: "drink-2f", kind: "item", at: [-1.0, -10.5], radius: 0.9, label: "Take the health drink" },
     { id: "diary-201", kind: "memo", at: [-6.1, -8.0], radius: 0.9, label: "Read the diary" },
   ],
   camZones: [{ min: [-9, -9], max: [-1.8, 1], cam: [-2.4, 3.15, 0.45] }],

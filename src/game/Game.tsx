@@ -13,6 +13,7 @@ import { Lobby, ScreenTicker, Shell, Ward } from "./scene/Building";
 import { GenericWard, Roof } from "./scene/Wards";
 import { WARD_SPECS } from "./floors";
 import { arriveOn } from "./events";
+import { attack, foes } from "./combat";
 import { installApiBase } from "./apiBase";
 import { enableVertexSnap } from "./scene/Retro";
 
@@ -20,14 +21,14 @@ installApiBase();
 if (typeof window !== "undefined" && useGame.getState().retro) enableVertexSnap([400, 300]);
 import { CameraRig } from "./scene/CameraRig";
 import { Effects } from "./scene/Effects";
-import { Interaction, WalkMarker } from "./scene/Interaction";
+import { Interaction, Pickups, WalkMarker } from "./scene/Interaction";
 import { IntroScene } from "./scene/IntroScene";
 import { Monsters } from "./scene/Monsters";
 import { LevelColliders, Player } from "./scene/Player";
 import { Physics } from "@react-three/rapier";
 import { runtime, useGame } from "./store";
 import { ENTRY_TAPE } from "./config/tapes.config";
-import { Ending, FadeLayer, Hud, nextTape, OtherworldTint, Overlays, playTape, stopTape, TearFlash, ToolOverlay } from "./ui/Hud";
+import { DeathScreen, Ending, FadeLayer, Hud, HurtLayer, nextTape, OtherworldTint, Overlays, playTape, stopTape, TearFlash, ToolOverlay } from "./ui/Hud";
 import { IntroOverlay, StormCinematic, TitleScreen } from "./ui/Title";
 
 function finishIntro() {
@@ -86,6 +87,7 @@ function World() {
           </Suspense>
           <CameraRig />
           <Interaction />
+          <Pickups />
           <WalkMarker />
           <Dust />
         </>
@@ -96,7 +98,7 @@ function World() {
 }
 
 // Handle for debugging and automated screenshots.
-if (typeof window !== "undefined") (window as unknown as Record<string, unknown>).__brookhaven = { useGame, runtime };
+if (typeof window !== "undefined") (window as unknown as Record<string, unknown>).__brookhaven = { useGame, runtime, foes };
 
 export default function Game() {
   const phase = useGame((s) => s.phase);
@@ -125,6 +127,7 @@ export default function Game() {
       runtime.keys.add(e.code);
       if (e.code === "KeyE" && runtime.near) interact(runtime.near);
       if (e.code === "KeyN") toggleNightmare();
+      if (e.code === "KeyF" || e.code === "Space") attack();
       if (e.code === "KeyT") nextTape();
       if (e.code === "KeyP") {
         if (g.tapePlaying) stopTape();
@@ -158,6 +161,14 @@ export default function Game() {
     window.addEventListener("keyup", up);
     window.addEventListener("blur", blur);
     window.addEventListener("mousemove", move);
+    // right mouse button swings the pipe
+    const ctx = (e: MouseEvent) => {
+      const g = useGame.getState();
+      if (g.phase !== "play" || g.overlay || g.activeTool) return;
+      e.preventDefault();
+      attack();
+    };
+    window.addEventListener("contextmenu", ctx);
     document.addEventListener("mouseleave", leave);
     document.addEventListener("pointerlockchange", lockChange);
     return () => {
@@ -165,6 +176,7 @@ export default function Game() {
       window.removeEventListener("keyup", up);
       window.removeEventListener("blur", blur);
       window.removeEventListener("mousemove", move);
+      window.removeEventListener("contextmenu", ctx);
       document.removeEventListener("mouseleave", leave);
       document.removeEventListener("pointerlockchange", lockChange);
     };
@@ -234,6 +246,8 @@ export default function Game() {
           <ToolOverlay />
           <Overlays />
           <Ending />
+          <HurtLayer />
+          <DeathScreen />
         </>
       )}
       <TearFlash />

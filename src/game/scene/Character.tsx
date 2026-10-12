@@ -3,6 +3,7 @@
 import { useFrame } from "@react-three/fiber";
 import { Suspense, use, useEffect, useMemo, useRef, type RefObject } from "react";
 import { loadGLTF } from "../assets";
+import { useGame } from "../store";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import * as THREE from "three";
 
@@ -284,7 +285,7 @@ function HeroBody({ pose }: { pose: RefObject<Pose> }) {
         mat.roughness = Math.max(mat.roughness ?? 0.8, 0.7);
         mat.metalness = Math.min(mat.metalness ?? 0, 0.15);
         // the parade-ground tan becomes worn olive field gear
-        mat.color.set("#5d6646");
+        mat.color.set("#858d6c");
         if (/visor/i.test(m.name)) m.visible = false;
       }
     });
@@ -298,7 +299,20 @@ function HeroBody({ pose }: { pose: RefObject<Pose> }) {
       a.setEffectiveWeight(0);
     });
     idle.setEffectiveWeight(1);
-    return { model, mixer, idle, walk, run };
+    // the steel pipe, carried in the right hand (bone space is centimetres)
+    const bones: Record<string, THREE.Bone> = {};
+    model.traverse((o) => {
+      if ((o as THREE.Bone).isBone) bones[o.name] = o as THREE.Bone;
+    });
+    const pipe = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.6, 1.6, 95, 10),
+      new THREE.MeshStandardMaterial({ color: "#6b6a64", roughness: 0.45, metalness: 0.85 }),
+    );
+    pipe.castShadow = true;
+    pipe.rotation.x = Math.PI / 2;
+    pipe.position.set(0, 9, 22);
+    bones.mixamorigRightHand?.add(pipe);
+    return { model, mixer, idle, walk, run, bones };
   }, [gltf]);
   useEffect(() => () => void rig.mixer.stopAllAction(), [rig]);
 
@@ -313,6 +327,18 @@ function HeroBody({ pose }: { pose: RefObject<Pose> }) {
     rig.walk.setEffectiveTimeScale(0.75 + Math.min(a, 1.2) * 0.35);
     rig.run.setEffectiveTimeScale(0.8 + r * 0.25);
     rig.mixer.update(Math.min(dt, 0.05));
+
+    // the swing: wind up over the shoulder, then bring it down across the body
+    const p = (performance.now() - useGame.getState().swingAt) / 520;
+    if (p >= 0 && p < 1) {
+      const lift = p < 0.35 ? p / 0.35 : 1 - (p - 0.35) / 0.65;
+      const strike = p < 0.35 ? 0 : Math.sin(((p - 0.35) / 0.65) * Math.PI);
+      const b = rig.bones;
+      b.mixamorigSpine2?.rotateY(lift * 0.5 - strike * 0.7);
+      b.mixamorigRightArm?.rotateX(-lift * 1.5 + strike * 0.9);
+      b.mixamorigRightArm?.rotateZ(lift * 0.6);
+      b.mixamorigRightForeArm?.rotateX(-lift * 0.9);
+    }
   });
 
   return <primitive object={rig.model} rotation={[0, Math.PI, 0]} />;
