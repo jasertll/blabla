@@ -6,10 +6,13 @@ import { BlendFunction, type ChromaticAberrationEffect, type NoiseEffect, type V
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { runtime, useGame } from "../store";
+import { DitherEffect } from "./Retro";
 
 /** Film grain, vignette and lens fringing — heavier as the world rots. */
 export function Effects() {
   const quality = useGame((s) => s.quality);
+  const retro = useGame((s) => s.retro);
+  const dither = useMemo(() => new DitherEffect(40), []);
   const noise = useRef<NoiseEffect>(null!);
   const vignette = useRef<VignetteEffect>(null!);
   const ca = useRef<ChromaticAberrationEffect>(null!);
@@ -32,6 +35,7 @@ export function Effects() {
         <HueSaturation hue={0.04} saturation={-0.3} />
         <Noise ref={noise} premultiply blendFunction={BlendFunction.SCREEN} />
         <Vignette ref={vignette} eskil={false} offset={0.22} darkness={0.75} />
+        {retro && <primitive object={dither} />}
       </EffectComposer>
     );
 
@@ -45,6 +49,7 @@ export function Effects() {
       <ChromaticAberration ref={ca} offset={offset} radialModulation modulationOffset={0.25} />
       <Noise ref={noise} premultiply blendFunction={BlendFunction.SCREEN} />
       <Vignette ref={vignette} eskil={false} offset={0.22} darkness={0.75} />
+      {retro && <primitive object={dither} />}
     </EffectComposer>
   );
 }

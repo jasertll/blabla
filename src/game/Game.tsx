@@ -3,7 +3,7 @@
 import { Canvas } from "@react-three/fiber";
 import { InvestigationProvider } from "@/contexts/InvestigationContext";
 import { ToolBridge } from "./tools/Bridge";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import * as THREE from "three";
 import { closeOverlay, interact, toggleNightmare } from "./actions";
 import { audio } from "./audio";
@@ -14,8 +14,10 @@ import { GenericWard, Roof } from "./scene/Wards";
 import { WARD_SPECS } from "./floors";
 import { arriveOn } from "./events";
 import { installApiBase } from "./apiBase";
+import { enableVertexSnap } from "./scene/Retro";
 
 installApiBase();
+if (typeof window !== "undefined" && useGame.getState().retro) enableVertexSnap([400, 300]);
 import { CameraRig } from "./scene/CameraRig";
 import { Effects } from "./scene/Effects";
 import { Interaction, WalkMarker } from "./scene/Interaction";
@@ -187,7 +189,16 @@ export default function Game() {
     [],
   );
 
-  const dpr: [number, number] = quality === "high" ? [1, 1.75] : quality === "medium" ? [1, 1.25] : [0.6, 0.85];
+  const retro = useGame((s) => s.retro);
+  const [vh, setVh] = useState(typeof window === "undefined" ? 800 : window.innerHeight);
+  useEffect(() => {
+    const r = () => setVh(window.innerHeight);
+    window.addEventListener("resize", r);
+    return () => window.removeEventListener("resize", r);
+  }, []);
+  // retro: draw about 400 lines and let the browser scale them up, unsmoothed
+  const retroDpr = Math.max(0.25, Math.min(1, 400 / vh));
+  const dpr: [number, number] = retro ? [retroDpr, retroDpr] : quality === "high" ? [1, 1.75] : quality === "medium" ? [1, 1.25] : [0.6, 0.85];
 
   return (
     <InvestigationProvider>
@@ -197,6 +208,7 @@ export default function Game() {
         <Canvas
           shadows={{ type: THREE.PCFShadowMap }}
           dpr={dpr}
+          style={retro ? { imageRendering: "pixelated" } : undefined}
           camera={{ fov: 52, near: 0.05, far: 90, position: [0, 1.6, 8] }}
           gl={{ antialias: false, powerPreference: "high-performance", stencil: false }}
           onCreated={({ gl }) => {

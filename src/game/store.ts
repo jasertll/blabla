@@ -70,6 +70,9 @@ interface GameState {
   overlay: null | "map" | "cassette" | "memo" | "elevator" | "settings" | "case" | "keypad";
   fade: number;
   quality: Quality;
+  /** PlayStation-era rendering: low resolution, dithered colour, wobbling vertices. */
+  retro: boolean;
+  setRetro: (on: boolean) => void;
   muted: boolean;
   tapeId: string | null;
   tapePlaying: boolean;
@@ -127,6 +130,21 @@ export const useGame = create<GameState>((set, get) => ({
   overlay: null,
   fade: 0,
   quality: "medium",
+  retro: (() => {
+    try {
+      return localStorage.getItem("brookhaven.retro") !== "0";
+    } catch {
+      return true;
+    }
+  })(),
+  setRetro: (retro) => {
+    try {
+      localStorage.setItem("brookhaven.retro", retro ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+    set({ retro });
+  },
   muted: false,
   tapeId: null,
   tapePlaying: false,

@@ -279,6 +279,7 @@ function ApiServerField() {
 
 function SettingsOverlay() {
   const quality = useGame((s) => s.quality);
+  const retro = useGame((s) => s.retro);
   const muted = useGame((s) => s.muted);
   const g = useGame.getState();
   return (
@@ -300,6 +301,12 @@ function SettingsOverlay() {
           <p className="text-sm text-white/50">SOUND</p>
           <button onClick={() => g.toggleMute()} className="border border-white/25 px-4 py-2">
             {muted ? "OFF" : "ON"}
+          </button>
+        </div>
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-white/50">PS1 LOOK (low-res, dithered)</p>
+          <button onClick={() => g.setRetro(!useGame.getState().retro)} className="border border-white/25 px-4 py-2">
+            {retro ? "ON" : "OFF"}
           </button>
         </div>
         <ApiServerField />
