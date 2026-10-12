@@ -12,6 +12,11 @@ const FOG: Record<PlayFloor, { color: string; density: number }> = {
   EXTERIOR: { color: "#8d8f8b", density: 0.06 },
   "1F": { color: "#262826", density: 0.05 },
   "2F": { color: "#1f211f", density: 0.075 },
+  "3F": { color: "#1e201d", density: 0.08 },
+  "4F": { color: "#221f1b", density: 0.07 },
+  B1: { color: "#121513", density: 0.095 },
+  B2: { color: "#141311", density: 0.09 },
+  ROOF: { color: "#7d807c", density: 0.075 },
 };
 const OTHER = { color: "#140605", density: 0.085 };
 const NIGHTMARE = { color: "#070202", density: 0.11 };
@@ -56,8 +61,8 @@ export function Atmosphere() {
     fog.color.copy(c1).lerp(c2, runtime.dread);
     fog.density = THREE.MathUtils.lerp(base.density, dark.density, runtime.dread);
 
-    hemi.current.intensity = g.floor === "EXTERIOR" ? 1.1 : THREE.MathUtils.lerp(0.32, 0.12, runtime.dread);
-    hemi.current.color.set(g.floor === "EXTERIOR" ? "#b9bdb8" : "#6d7570").lerp(c2.set("#ff3018"), runtime.dread * 0.5);
+    hemi.current.intensity = g.floor === "EXTERIOR" || g.floor === "ROOF" ? 1.1 : THREE.MathUtils.lerp(0.32, 0.12, runtime.dread);
+    hemi.current.color.set(g.floor === "EXTERIOR" || g.floor === "ROOF" ? "#b9bdb8" : "#6d7570").lerp(c2.set("#ff3018"), runtime.dread * 0.5);
 
     // the radio
     staticAcc.current += dt;

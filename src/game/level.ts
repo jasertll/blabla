@@ -1,4 +1,5 @@
 import type { PlayFloor } from "./store";
+import { buildWard, ROOF, WARD_SPECS } from "./floors";
 
 // Floor layouts. Walls are axis-aligned segments; they are both rendered and
 // used as colliders. Units are metres, Y is up, the hospital entrance faces +Z.
@@ -16,7 +17,7 @@ export interface Box {
   max: V2;
 }
 
-export type InteractKind = "tool" | "elevator" | "locked" | "memo" | "save" | "cassette" | "message";
+export type InteractKind = "tool" | "elevator" | "locked" | "memo" | "save" | "cassette" | "message" | "phone";
 
 export interface Interactable {
   id: string;
@@ -28,6 +29,8 @@ export interface Interactable {
   toolId?: string;
   room?: string;
   text?: string;
+  /** Path node to walk to when travelling here. */
+  node?: string;
   /** Camera flight target when examining. */
   focus?: { cam: V3; look: V3 };
 }
@@ -42,6 +45,8 @@ export interface FloorLayout {
   id: PlayFloor;
   title: string;
   height: number;
+  /** Open sky: no ceiling, parapet instead of walls. */
+  outdoor?: boolean;
   rects: Box[]; // floor / ceiling pieces
   walls: Wall[];
   colliders: Box[];
@@ -225,9 +230,19 @@ const WARD: FloorLayout = {
   ],
 };
 
-export const FLOOR_LAYOUTS: Record<"1F" | "2F", FloorLayout> = { "1F": LOBBY, "2F": WARD };
+export type BuiltFloor = Exclude<PlayFloor, "EXTERIOR">;
 
-export const layoutFor = (f: PlayFloor) => (f === "1F" || f === "2F" ? FLOOR_LAYOUTS[f] : null);
+export const FLOOR_LAYOUTS: Record<BuiltFloor, FloorLayout> = {
+  "1F": LOBBY,
+  "2F": WARD,
+  "3F": buildWard(WARD_SPECS["3F"]),
+  "4F": buildWard(WARD_SPECS["4F"]),
+  B1: buildWard(WARD_SPECS.B1),
+  B2: buildWard(WARD_SPECS.B2),
+  ROOF,
+};
+
+export const layoutFor = (f: PlayFloor) => (f === "EXTERIOR" ? null : FLOOR_LAYOUTS[f]);
 
 /** Wall segments → thin boxes for collision. */
 export function wallBoxes(layout: FloorLayout): Box[] {

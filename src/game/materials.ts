@@ -4,7 +4,7 @@ import { normalTex, tex } from "./textures";
 // Surfaces register themselves here so the whole hospital can flip to the
 // Otherworld in one pass when `runtime.dread` crosses the threshold.
 
-export type SurfaceKind = "wall" | "floor" | "ceiling" | "door";
+export type SurfaceKind = "wall" | "floor" | "ceiling" | "door" | "roof";
 
 interface Look {
   map: THREE.Texture;
@@ -36,6 +36,10 @@ const looks: Record<SurfaceKind, (rx: number, ry: number) => [Look, Look]> = {
   ceiling: (rx, ry) => [
     { map: tex("ceiling", rx, ry), normal: normalTex("ceiling", rx, ry, 5), color: new THREE.Color(0.9, 0.9, 0.88), roughness: 0.95, metalness: 0, bump: 0.8 },
     { map: tex("rust", rx, ry), normal: normalTex("rust", rx, ry, 8), color: new THREE.Color(0.45, 0.32, 0.3), roughness: 0.7, metalness: 0.3, bump: 1.4 },
+  ],
+  roof: (rx, ry) => [
+    { map: tex("ceiling", rx * 2, ry * 2), normal: normalTex("ceiling", rx * 2, ry * 2, 6), color: new THREE.Color(0.55, 0.56, 0.54), roughness: 0.95, metalness: 0, bump: 1.2 },
+    { map: tex("grate", rx * 2, ry * 2), normal: normalTex("grate", rx * 2, ry * 2, 10), color: new THREE.Color(1, 0.9, 0.85), roughness: 0.5, metalness: 0.55, bump: 1.5 },
   ],
   door: () => [
     { map: tex("door"), normal: normalTex("door", 1, 1, 6), color: new THREE.Color(1, 1, 1), roughness: 0.75, metalness: 0.2, bump: 1 },

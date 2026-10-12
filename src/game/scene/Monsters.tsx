@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { layoutFor, wallBoxes, type Box, type V2 } from "../level";
+import { B1_BARS_Z } from "../floors";
 import { runtime, useGame, type PlayFloor } from "../store";
 import { baseTexture } from "../textures";
 import { stalkerSkin, useCreature, useStalker } from "./Creature";
@@ -369,14 +370,29 @@ export function Monsters({ floor }: { floor: PlayFloor }) {
       </group>
     );
   }
-  const corridor = { min: [-1.2, -23] as V2, max: [1.2, -7] as V2 };
+  if (floor === "ROOF") {
+    return (
+      <group>
+        <FogShadows count={intense ? 6 : 3} areas={layout.rects} minDist={8} maxDist={18} />
+        {intense && <Stalker id="r-s" area={{ min: [-11, -13], max: [11, 1] }} boxes={boxes} start={[10, -12]} />}
+        {nightmare && <Watcher id="r-w" at={[9.5, -12.5]} yaw={-0.5} />}
+      </group>
+    );
+  }
+  // corridors: everything lives in the long main hall
+  const c = layout.rects[0];
+  const zMin = floor === "B1" ? B1_BARS_Z + 1 : c.min[1] + 1;
+  const zMax = c.max[1];
+  const len = zMax - zMin;
+  const far: V2 = [0, zMin + 2];
+  const deep = floor === "B1" || floor === "B2";
   return (
     <group>
-      <FogShadows count={intense ? 5 : 2} areas={[{ min: [-1.4, -23], max: [1.4, -6] }]} minDist={7} maxDist={18} />
-      <LyingFigure id="2f-a" area={corridor} boxes={boxes} start={[0, -18]} />
-      <Stalker id="2f-s" area={{ min: [-1.2, -23], max: [1.2, 2.5] }} boxes={boxes} start={[0, -22]} />
-      {intense && <LyingFigure id="2f-b" area={{ min: [-1.2, -14], max: [1.2, 2.5] }} boxes={boxes} start={[0.5, -13]} />}
-      {nightmare && <Watcher id="2f-w" at={[0, -22.9]} yaw={0} />}
+      <FogShadows count={intense ? 5 : 2} areas={[{ min: [-1.4, zMin], max: [1.4, zMax - 10] }]} minDist={7} maxDist={18} />
+      <LyingFigure id={`${floor}-a`} area={{ min: [-1.2, zMin], max: [1.2, zMax - 11] }} boxes={boxes} start={[0, zMin + len * 0.3]} />
+      {(floor !== "3F" || intense) && <Stalker id={`${floor}-s`} area={{ min: [-1.2, zMin], max: [1.2, zMax - 1.5] }} boxes={boxes} start={far} />}
+      {(intense || deep) && <LyingFigure id={`${floor}-b`} area={{ min: [-1.2, zMin + len * 0.4], max: [1.2, zMax - 1.5] }} boxes={boxes} start={[0.5, zMin + len * 0.55]} />}
+      {nightmare && <Watcher id={`${floor}-w`} at={[0, zMin + 0.1]} yaw={0} />}
     </group>
   );
 }

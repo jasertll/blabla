@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { audio } from "./audio";
+import { answerPhone, cellText, mirrorChange } from "./events";
 import { findPath, layoutFor, nearestNode, type Interactable } from "./level";
 import { runtime, useGame, type PlayFloor } from "./store";
 
@@ -89,6 +90,7 @@ export function interact(i: Interactable) {
     case "memo":
       audio.blip();
       runtime.memoId = i.id;
+      g.flag(`read:${i.id}`);
       g.setOverlay("memo");
       break;
     case "save":
@@ -97,7 +99,12 @@ export function interact(i: Interactable) {
       g.say("Your progress has been saved.");
       break;
     case "message":
-      if (i.text) g.say(i.text);
+      if (i.id === "mirror-201" && g.flags.includes("read:diary-201")) mirrorChange();
+      else if (i.id === "cell-b1") g.say(cellText());
+      else if (i.text) g.say(i.text);
+      break;
+    case "phone":
+      answerPhone();
       break;
   }
 }

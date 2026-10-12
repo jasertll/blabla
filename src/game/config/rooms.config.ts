@@ -22,13 +22,13 @@ export interface ToolEntry {
 }
 
 export const FLOORS: { id: FloorId; name: string; built: boolean }[] = [
-  { id: "ROOF", name: "Observatory", built: false },
-  { id: "4F", name: "Director's Wing", built: false },
-  { id: "3F", name: "Patient Records", built: false },
+  { id: "ROOF", name: "Observatory", built: true },
+  { id: "4F", name: "Director's Wing", built: true },
+  { id: "3F", name: "Patient Records", built: true },
   { id: "2F", name: "Investigation Ward", built: true },
   { id: "1F", name: "Reception", built: true },
-  { id: "B1", name: "Morgue", built: false },
-  { id: "B2", name: "Laboratory & Archive", built: false },
+  { id: "B1", name: "Morgue", built: true },
+  { id: "B2", name: "Laboratory & Archive", built: true },
 ];
 
 export const TOOLS: ToolEntry[] = [

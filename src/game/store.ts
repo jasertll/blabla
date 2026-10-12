@@ -4,7 +4,7 @@ import type { FloorId } from "./config/rooms.config";
 
 export type Phase = "title" | "storm" | "intro" | "play";
 export type Quality = "low" | "medium" | "high";
-export type PlayFloor = "EXTERIOR" | "1F" | "2F";
+export type PlayFloor = "EXTERIOR" | "1F" | "2F" | "3F" | "4F" | "B1" | "B2" | "ROOF";
 
 /** Per-frame mutable state. Lives outside React so the render loop never re-renders components. */
 export const runtime = {
@@ -46,6 +46,7 @@ interface SaveData {
   z: number;
   yaw: number;
   visited: string[];
+  flags?: string[];
 }
 
 interface GameState {
@@ -59,7 +60,13 @@ interface GameState {
   toolOpenedAt: number;
   prompt: string | null;
   message: { text: string; id: number } | null;
+  /** A voice that isn't the player's: the radio, the phone. */
+  voice: { who: string; text: string; id: number } | null;
+  speak: (who: string, text: string | null) => void;
   visited: string[];
+  /** Story beats that have happened (saved). */
+  flags: string[];
+  flag: (f: string) => void;
   overlay: null | "map" | "cassette" | "memo" | "elevator" | "settings";
   fade: number;
   quality: Quality;
@@ -110,7 +117,13 @@ export const useGame = create<GameState>((set, get) => ({
   toolOpenedAt: 0,
   prompt: null,
   message: null,
+  voice: null,
+  speak: (who, text) => set({ voice: text ? { who, text, id: Math.random() } : null }),
   visited: [],
+  flags: [],
+  flag: (f) => {
+    if (!get().flags.includes(f)) set((s) => ({ flags: [...s.flags, f] }));
+  },
   overlay: null,
   fade: 0,
   quality: "medium",
@@ -150,6 +163,7 @@ export const useGame = create<GameState>((set, get) => ({
       z: runtime.pos.z,
       yaw: runtime.yaw,
       visited: s.visited,
+      flags: s.flags,
     };
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -165,7 +179,7 @@ export const useGame = create<GameState>((set, get) => ({
       runtime.pos.set(d.x, 0, d.z);
       runtime.yaw = d.yaw;
       runtime.camYaw = d.yaw;
-      set({ floor: d.floor, visited: d.visited ?? [] });
+      set({ floor: d.floor, visited: d.visited ?? [], flags: d.flags ?? [] });
       return true;
     } catch {
       return false;
@@ -179,3 +193,5 @@ export const isOtherworld = () => {
 };
 
 export type { FloorId };
+
+export const hasFlag = (f: string) => useGame.getState().flags.includes(f);

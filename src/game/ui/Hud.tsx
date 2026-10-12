@@ -6,7 +6,8 @@ import { ToolView } from "../tools/registry";
 import { audio } from "../audio";
 import { FLOORS, TOOLS, toolById } from "../config/rooms.config";
 import { TAPES } from "../config/tapes.config";
-import { FLOOR_LAYOUTS, layoutFor } from "../level";
+import { FLOOR_LAYOUTS, layoutFor, nearestNode, type BuiltFloor } from "../level";
+import { MEMOS } from "../config/story";
 import { runtime, useGame, type PlayFloor } from "../store";
 
 // ------------------------------------------------------------------ HUD
@@ -42,6 +43,7 @@ export function Hud() {
         </div>
       )}
       <Message />
+      <Voice />
       <Radio />
       {hint && !busy && (
         <div className="absolute bottom-4 left-4 max-w-[90vw] font-mono text-[11px] leading-relaxed tracking-wider text-white/45">
@@ -174,38 +176,6 @@ export function Overlays() {
   }
 }
 
-const MEMOS: Record<string, { found: string; body: React.ReactNode }> = {
-  "memo-lobby": {
-    found: "found on a bench in the lobby",
-    body: (
-      <>
-        <p>To whoever reads this,</p>
-        <p className="mt-3">
-          The hospital closed in the spring, but the servers in the basement never powered down. Every night the terminals upstairs light up on
-          their own and start scanning. Addresses. Names. Files nobody uploaded.
-        </p>
-        <p className="mt-3">
-          Each room keeps one of the instruments. I mapped the second floor before the doors started locking themselves. The rest is yours.
-        </p>
-        <p className="mt-3">If the radio starts to hiss, turn your light toward it. They hate the light.</p>
-        <p className="mt-5 text-right italic">— M.</p>
-      </>
-    ),
-  },
-  "diary-201": {
-    found: "pages torn from a diary, room 201",
-    body: (
-      <>
-        <p>Day 3. The nurse says the terminal in my room isn&apos;t plugged into anything. Then how does it know my name?</p>
-        <p className="mt-3">Day 9. Tonight it printed every address on my street. Only the houses with their lights on.</p>
-        <p className="mt-3">Day 14. I asked them to take it away. They told me there has never been a terminal in room 201.</p>
-        <p className="mt-3">Day 15. I stopped sleeping. It doesn&apos;t sleep either. We understand each other now.</p>
-        <p className="mt-5 italic">Day ?. If you are reading this, it is looking at you.</p>
-      </>
-    ),
-  },
-};
-
 function MemoOverlay() {
   const memo = MEMOS[runtime.memoId] ?? MEMOS["memo-lobby"];
   return (
@@ -213,6 +183,7 @@ function MemoOverlay() {
       <div onClick={(e) => e.stopPropagation()} className="memo relative w-full max-w-md rotate-[-1.2deg] p-8 font-typewriter text-[15px] leading-7 text-[#2a241a]">
         <p className="mb-4 text-right text-xs">— {memo.found}</p>
         {memo.body}
+        {memo.sign && <p className="mt-5 text-right font-hand text-2xl text-[#5a1a10]">{memo.sign}</p>}
         <button onClick={closeOverlay} className="absolute -bottom-10 left-1/2 -translate-x-1/2 font-display text-sm tracking-[0.3em] text-white/60">
           CLOSE
         </button>
@@ -309,7 +280,7 @@ function MapOverlay() {
   const current = useGame((s) => s.floor);
   const visited = useGame((s) => s.visited);
   const [floor, setFloor] = useState<PlayFloor>(current === "EXTERIOR" ? "1F" : current);
-  const layout = FLOOR_LAYOUTS[floor as "1F" | "2F"];
+  const layout = FLOOR_LAYOUTS[floor as BuiltFloor];
   const xs = layout.rects.flatMap((r) => [r.min[0], r.max[0]]);
   const zs = layout.rects.flatMap((r) => [r.min[1], r.max[1]]);
   const pad = 2;
@@ -320,20 +291,22 @@ function MapOverlay() {
   const W = maxX - minX;
   const H = maxZ - minZ;
 
-  const targets: { label: string; node: string; at: [number, number]; seen: boolean; tool?: string }[] =
-    floor === "1F"
-      ? [
-          { label: "OVERVIEW", node: "overview", at: [0, -4], seen: visited.includes("lobby"), tool: "overview" },
-          { label: "TAPES", node: "cassette", at: [-3.1, -4], seen: visited.includes("lobby") },
-          { label: "SAVE", node: "save", at: [-9.2, -5], seen: visited.includes("lobby") },
-          { label: "LIFT", node: "elevator", at: [11, 0], seen: true },
-        ]
-      : [
-          { label: "201 · IP / ASN", node: "desk", at: [-5.4, -4], seen: visited.includes("201"), tool: "ip-asn" },
-          { label: "LIFT", node: "elevator", at: [0, 3.2], seen: true },
-        ];
-  const doors: Record<string, [number, number]> = { "202": [3.4, -4], "203": [-3.4, -12], "204": [3.4, -12], "205": [-3.4, -20], "206": [3.4, -20] };
-  const wardRooms = floor === "2F" ? TOOLS.filter((t) => doors[t.room]) : [];
+  const flags = useGame((s) => s.flags);
+  const targets = layout.interactables
+    .filter((i) => ["tool", "memo", "elevator", "save", "cassette", "phone"].includes(i.kind))
+    .filter((i) => i.room !== "???" || visited.includes("???"))
+    .map((i) => {
+      const tool = i.toolId ? toolById(i.toolId) : undefined;
+      const label =
+        i.kind === "tool" ? (tool ? `${i.room === "lobby" ? "" : `${i.room} · `}${shortName(tool.name).split(" ").slice(0, 2).join(" ").replace(/[\s/&]+$/, "")}` : i.label)
+        : i.kind === "memo" ? "NOTE"
+        : i.kind === "elevator" ? "LIFT"
+        : i.kind === "save" ? "SAVE"
+        : i.kind === "cassette" ? "TAPES"
+        : "PHONE";
+      const seen = i.kind === "tool" ? visited.includes(i.room ?? "") : i.kind === "memo" ? flags.includes(`read:${i.id}`) : true;
+      return { label, node: i.node ?? nearestNode(layout, i.at[0], i.at[1]), at: i.at, seen, tool: i.toolId, key: i.id };
+    });
 
   return (
     <Panel wide onClose={closeOverlay}>
@@ -374,19 +347,9 @@ function MapOverlay() {
               <rect key={i} x={c.min[0]} y={c.min[1]} width={c.max[0] - c.min[0]} height={c.max[1] - c.min[1]} strokeWidth={0.06} />
             ))}
           </g>
-          {wardRooms.map((t) => {
-            const p = doors[t.room];
-            return (
-              <g key={t.id} transform={`translate(${p[0]} ${p[1]})`}>
-                <text textAnchor="middle" fontSize={0.9} fill="#5a5040" className="font-hand">
-                  {t.room}
-                </text>
-              </g>
-            );
-          })}
           {targets.map((t) => (
             <g
-              key={t.label}
+              key={t.key}
               transform={`translate(${t.at[0]} ${t.at[1]})`}
               className="cursor-pointer"
               onClick={() => {
@@ -396,9 +359,11 @@ function MapOverlay() {
             >
               <circle r={0.9} fill="transparent" />
               {t.seen && t.tool && <circle r={0.75} fill="none" stroke="#a3150e" strokeWidth={0.12} />}
-              <text textAnchor="middle" y={0.3} fontSize={1.05} fill={t.seen ? "#2a2318" : "#7a7060"} className="font-hand">
-                {t.label}
-              </text>
+              {t.label.split(" · ").map((part, k, all) => (
+                <text key={k} textAnchor="middle" y={0.3 + (k - (all.length - 1) / 2) * 0.9} fontSize={k ? 0.62 : 1.05} fill={t.seen ? "#2a2318" : "#7a7060"} className="font-hand">
+                  {part}
+                </text>
+              ))}
             </g>
           ))}
           {current === floor && (
@@ -558,6 +523,7 @@ export function ToolOverlay() {
 /** Every instrument in the building, by floor. Rooms not built yet open the
  *  instrument straight from the archive. */
 function InstrumentList() {
+  const visited = useGame((s) => s.visited);
   const open = (id: string) => {
     audio.blip();
     const g = useGame.getState();
@@ -570,7 +536,7 @@ function InstrumentList() {
       <p className="font-display text-xs tracking-[0.5em] text-white/40">THE INSTRUMENTS</p>
       <div className="mt-3 grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
         {FLOORS.map((f) => {
-          const tools = TOOLS.filter((t) => t.floor === f.id);
+          const tools = TOOLS.filter((t) => t.floor === f.id && (t.room !== "???" || visited.includes("???")));
           if (!tools.length) return null;
           return (
             <div key={f.id}>
@@ -612,4 +578,21 @@ export function TearFlash() {
 export function OtherworldTint() {
   const ow = useGame((s) => s.owActive);
   return <div className={`pointer-events-none absolute inset-0 z-10 transition-opacity duration-[3000ms] ow-tint ${ow ? "opacity-100" : "opacity-0"}`} />;
+}
+
+/** "IP / ASN Analyzer" → "IP / ASN"; keeps map labels short. */
+function shortName(n: string) {
+  return n.replace(/ (Analyzer|Inspector|Toolkit|Scanner|Generator|Tester|Mapper|Tracker|Dashboard|Report|Engine|Check|Scan|Forensics|Intelligence)$/i, "").toUpperCase();
+}
+
+/** Subtitles for voices that aren't yours: the radio, the phone. */
+export function Voice() {
+  const voice = useGame((s) => s.voice);
+  if (!voice) return null;
+  return (
+    <div key={voice.id} className="panel-in pointer-events-none absolute bottom-[30vh] left-1/2 w-[min(90vw,760px)] -translate-x-1/2 text-center">
+      <p className="font-mono text-[10px] tracking-[0.5em] text-red-400/70">{voice.who}</p>
+      <p className="mt-1 font-typewriter text-[clamp(1rem,1.9vw,1.3rem)] text-[#e8a79d] [text-shadow:0_0_14px_#000,0_0_3px_#400]">{voice.text}</p>
+    </div>
+  );
 }

@@ -112,7 +112,7 @@ export function Player() {
     const stepIdx = Math.floor(runtime.walkPhase / Math.PI);
     if (stepIdx !== lastStep.current && speed > 0.4) {
       lastStep.current = stepIdx;
-      audio.footstep(isOtherworld() ? "grate" : "tile", speed > 3);
+      audio.footstep(isOtherworld() ? "grate" : useGame.getState().floor === "ROOF" ? "asphalt" : "tile", speed > 3);
     }
 
     // room tracking for the map

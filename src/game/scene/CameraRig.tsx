@@ -22,7 +22,8 @@ export function CameraRig() {
   const floor = useGame((s) => s.floor);
   const walls = useMemo(() => {
     const l = layoutFor(floor);
-    return l ? wallBoxes(l) : [];
+    // outdoors the parapet is waist-high; only the tall structures block the camera
+    return l ? (l.outdoor ? l.colliders.slice(0, 1) : wallBoxes(l)) : [];
   }, [floor]);
   const snap = useRef(true);
   const lastFloor = useRef(floor);
@@ -98,7 +99,7 @@ export function CameraRig() {
         }
       }
     }
-    desired.y = Math.min(desired.y, layout.height - 0.25);
+    if (!layout.outdoor) desired.y = Math.min(desired.y, layout.height - 0.25);
 
     if (snap.current) {
       camera.position.copy(desired);

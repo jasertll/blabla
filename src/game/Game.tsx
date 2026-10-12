@@ -10,6 +10,9 @@ import { audio } from "./audio";
 import { layoutFor } from "./level";
 import { Atmosphere, Dust } from "./scene/Atmosphere";
 import { Lobby, ScreenTicker, Shell, Ward } from "./scene/Building";
+import { GenericWard, Roof } from "./scene/Wards";
+import { WARD_SPECS } from "./floors";
+import { arriveOn } from "./events";
 import { CameraRig } from "./scene/CameraRig";
 import { Effects } from "./scene/Effects";
 import { Interaction, WalkMarker } from "./scene/Interaction";
@@ -40,7 +43,7 @@ function finishIntro() {
     useGame.getState().setFade(0);
   }, 1500);
   window.setTimeout(() => {
-    useGame.getState().say("I've never been inside this place. So why do I know where the elevator is?");
+    useGame.getState().say("Elena, I came. I've never been inside this place… so why do I know where the elevator is?");
   }, 3200);
 }
 
@@ -56,7 +59,7 @@ function World() {
       {phase === "play" && layout && (
         <group key={floor}>
           <Shell layout={layout} />
-          {floor === "1F" ? <Lobby /> : <Ward />}
+          {floor === "1F" ? <Lobby /> : floor === "2F" ? <Ward /> : floor === "ROOF" ? <Roof /> : <GenericWard spec={WARD_SPECS[floor as keyof typeof WARD_SPECS]} />}
           <Suspense fallback={null}>
             <Monsters floor={floor} />
           </Suspense>
@@ -145,6 +148,15 @@ export default function Game() {
       document.removeEventListener("pointerlockchange", lockChange);
     };
   }, []);
+
+  // Scripted moments start when you step out of the elevator.
+  useEffect(
+    () =>
+      useGame.subscribe((s, prev) => {
+        if (s.phase === "play" && (s.floor !== prev.floor || prev.phase !== "play")) arriveOn(s.floor);
+      }),
+    [],
+  );
 
   // Release the mouse whenever a panel takes over the screen.
   useEffect(

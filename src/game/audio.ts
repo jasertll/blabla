@@ -403,6 +403,117 @@ class AudioEngine {
     d.stop(t + seconds + 1.7);
   }
 
+  private ringTimer: number | null = null;
+
+  /** An old bell telephone, ringing somewhere down the corridor. */
+  phoneRing(on: boolean, pan = 0) {
+    if (this.ringTimer) {
+      window.clearTimeout(this.ringTimer);
+      this.ringTimer = null;
+    }
+    if (!on || !this.ctx) return;
+    const ring = () => {
+      const ctx = this.ctx!;
+      const t = ctx.currentTime;
+      const out = ctx.createGain();
+      out.gain.value = 0.16;
+      const p = ctx.createStereoPanner();
+      p.pan.value = pan;
+      out.connect(p).connect(this.sfx);
+      for (const burst of [0, 0.45]) {
+        [1180, 1420].forEach((f) => {
+          const o = ctx.createOscillator();
+          o.type = "square";
+          o.frequency.value = f;
+          const am = ctx.createGain();
+          am.gain.value = 0;
+          // the hammer striking the bells, 20 times a second
+          for (let k = 0; k < 8; k++) {
+            am.gain.setValueAtTime(0.5, t + burst + k * 0.05);
+            am.gain.exponentialRampToValueAtTime(0.02, t + burst + k * 0.05 + 0.045);
+          }
+          const bp = ctx.createBiquadFilter();
+          bp.type = "bandpass";
+          bp.frequency.value = f;
+          bp.Q.value = 8;
+          o.connect(bp).connect(am).connect(out);
+          o.start(t + burst);
+          o.stop(t + burst + 0.42);
+        });
+      }
+      this.ringTimer = window.setTimeout(ring, 3000);
+    };
+    ring();
+  }
+
+  /** A voice that isn't quite there: syllables of filtered noise and a buzzing
+   *  glottal tone, chopped and smeared through the radio. */
+  voice(seconds: number, pitch = 190) {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const out = ctx.createGain();
+    out.gain.value = 0;
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 350;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 2800;
+    out.connect(hp).connect(lp).connect(this.sfx);
+    const src = ctx.createOscillator();
+    src.type = "sawtooth";
+    src.frequency.value = pitch;
+    const n = this.noise();
+    const ng = ctx.createGain();
+    ng.gain.value = 0.25;
+    const formants = [700, 1200, 2500].map((f) => {
+      const b = ctx.createBiquadFilter();
+      b.type = "bandpass";
+      b.frequency.value = f;
+      b.Q.value = 9;
+      src.connect(b);
+      n.connect(ng).connect(b);
+      b.connect(out);
+      return b;
+    });
+    let at = t;
+    while (at < t + seconds) {
+      const syl = 0.09 + Math.random() * 0.16;
+      out.gain.setValueAtTime(0, at);
+      out.gain.linearRampToValueAtTime(0.32, at + 0.03);
+      out.gain.linearRampToValueAtTime(0.0, at + syl);
+      src.frequency.setValueAtTime(pitch * (0.85 + Math.random() * 0.35), at);
+      formants[0].frequency.setValueAtTime(400 + Math.random() * 500, at);
+      formants[1].frequency.setValueAtTime(900 + Math.random() * 1200, at);
+      at += syl + (Math.random() < 0.2 ? 0.25 : 0.03);
+    }
+    src.start(t);
+    n.start(t);
+    src.stop(t + seconds + 0.3);
+    n.stop(t + seconds + 0.3);
+    // the radio fights it
+    this.staticGain.gain.setTargetAtTime(0.12, t, 0.05);
+    this.staticGain.gain.setTargetAtTime(this.staticLevel * 0.22, t + seconds, 0.2);
+  }
+
+  /** Phone handset lifted / put down. */
+  click() {
+    if (!this.ctx) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const n = this.noise(false);
+    const f = ctx.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.value = 900;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.6, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    n.connect(f).connect(g).connect(this.sfx);
+    n.start(t);
+    n.stop(t + 0.15);
+  }
+
   blip() {
     if (!this.ctx) return;
     const ctx = this.ctx;

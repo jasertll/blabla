@@ -123,7 +123,7 @@ export function TitleScreen() {
 }
 
 const LINES = [
-  { at: 0.8, to: 5.2, text: "The letter said the network inside was still running." },
+  { at: 0.8, to: 5.2, text: "Three years since Elena disappeared. Then her letter came: the network inside is still running." },
   { at: 5.6, to: 9.6, text: "Nobody has worked here for years." },
   { at: 10, to: 13.4, text: "Somebody is still logging in." },
 ];

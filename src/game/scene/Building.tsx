@@ -26,6 +26,7 @@ import {
   WallClock,
 } from "./Props";
 import { ThreatGlobe } from "./ThreatGlobe";
+import { MirrorGhost } from "./Wards";
 
 // ------------------------------------------------------------------ shell
 
@@ -39,8 +40,8 @@ export function Shell({ layout }: { layout: FloorLayout }) {
         pos: [(r.min[0] + r.max[0]) / 2, 0, (r.min[1] + r.max[1]) / 2] as V3,
         w,
         d,
-        floor: surface("floor", w / 4, d / 4),
-        ceil: surface("ceiling", w / 1.2, d / 1.2),
+        floor: layout.outdoor ? surface("roof", w / 6, d / 6) : surface("floor", w / 4, d / 4),
+        ceil: layout.outdoor ? null : surface("ceiling", w / 1.2, d / 1.2),
       };
     });
     const walls = layout.walls.map(({ a, b }) => {
@@ -60,7 +61,7 @@ export function Shell({ layout }: { layout: FloorLayout }) {
     () => () => {
       parts.floors.forEach((f) => {
         releaseSurface(f.floor);
-        releaseSurface(f.ceil);
+        if (f.ceil) releaseSurface(f.ceil);
       });
       parts.walls.forEach((w) => releaseSurface(w.mat));
     },
@@ -83,9 +84,11 @@ export function Shell({ layout }: { layout: FloorLayout }) {
           >
             <planeGeometry args={[f.w, f.d]} />
           </mesh>
-          <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, parts.H, 0]} material={f.ceil} receiveShadow>
-            <planeGeometry args={[f.w, f.d]} />
-          </mesh>
+          {f.ceil && (
+            <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, parts.H, 0]} material={f.ceil} receiveShadow>
+              <planeGeometry args={[f.w, f.d]} />
+            </mesh>
+          )}
         </group>
       ))}
       {parts.walls.map((w, i) => (
@@ -616,6 +619,7 @@ export function Ward() {
         <BedsideCabinet position={[-6.6, 0, -8.6]} />
         <IVStand position={[-6.55, 0, -7.55]} />
         <SinkMirror position={[-7.6, 0, 0.9]} rotY={Math.PI} />
+        <MirrorGhost position={[-7.6, 0, 0.9]} rotY={Math.PI} />
         <Wardrobe position={[-8.5, 0, -8.5]} rotY={Math.PI / 2} />
         {/* the diary on the bedside cabinet */}
         <mesh position={[-6.55, 0.81, -8.55]} rotation={[-Math.PI / 2, 0, 0.4]} material={M.paper}>
@@ -645,4 +649,4 @@ export function Ward() {
   );
 }
 
-export { CRT, Decal };
+export { CRT, Decal, FogWindow, Gurney, Wheelchair };
